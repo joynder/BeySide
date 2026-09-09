@@ -21,6 +21,13 @@ class StorageManager {
     this.teams = [];
     this.clubs = [];
     this.currentTeamId = null;
+    this.remoteEnabled = false;
+    this.remoteSyncPending = false;
+    this.remoteSyncInFlight = false;
+    this.remotePollTimer = null;
+    this.remoteSaveTimer = null;
+    this.remoteRevision = null;
+    this.lastSharedState = null;
     this.initSynchronous();
   }
 
@@ -35,21 +42,21 @@ class StorageManager {
         this.events = JSON.parse(localEvents);
       } else {
         this.events = JSON.parse(JSON.stringify(DEFAULT_EVENTS));
-        this.saveEvents();
+        this.saveLocal(STORAGE_KEYS.EVENTS, this.events);
       }
 
       if (localTeams) {
         this.teams = JSON.parse(localTeams);
       } else {
         this.teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
-        this.saveTeams();
+        this.saveLocal(STORAGE_KEYS.TEAMS, this.teams);
       }
 
       if (localClubs) {
         this.clubs = JSON.parse(localClubs);
       } else {
         this.clubs = JSON.parse(JSON.stringify(DEFAULT_CLUBS));
-        this.saveClubs();
+        this.saveLocal(STORAGE_KEYS.CLUBS, this.clubs);
       }
 
       if (localSession) {
@@ -64,7 +71,7 @@ class StorageManager {
           migrated = true;
         }
       });
-      if (migrated) this.saveEvents();
+      if (migrated) this.saveLocal(STORAGE_KEYS.EVENTS, this.events);
 
     } catch (err) {
       console.warn("Storage init fallback", err);
@@ -75,26 +82,190 @@ class StorageManager {
   }
 
   saveEvents() {
-    try {
-      localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(this.events));
-    } catch (e) {
-      console.error("Error saving events", e);
-    }
+    this.saveLocal(STORAGE_KEYS.EVENTS, this.events);
+    this.queueRemoteSync();
   }
 
   saveTeams() {
-    try {
-      localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify(this.teams));
-    } catch (e) {
-      console.error("Error saving teams", e);
-    }
+    this.saveLocal(STORAGE_KEYS.TEAMS, this.teams);
+    this.queueRemoteSync();
   }
 
   saveClubs() {
+    this.saveLocal(STORAGE_KEYS.CLUBS, this.clubs);
+    this.queueRemoteSync();
+  }
+
+  saveLocal(key, value) {
     try {
-      localStorage.setItem(STORAGE_KEYS.CLUBS, JSON.stringify(this.clubs));
+      localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.error("Error saving clubs", e);
+      console.error("Error saving local data", e);
+    }
+  }
+
+  getSharedState() {
+    return {
+      events: this.events || [],
+      teams: this.teams || [],
+      clubs: this.clubs || []
+    };
+  }
+
+  hasSharedData(state) {
+    return state.events.length > 0 || state.teams.length > 0 || state.clubs.length > 0;
+  }
+
+  applySharedState(state) {
+    if (!state || !Array.isArray(state.events) || !Array.isArray(state.teams) || !Array.isArray(state.clubs)) {
+      throw new Error('Formato dei dati condivisi non valido.');
+    }
+    this.events = state.events;
+    this.teams = state.teams;
+    this.clubs = state.clubs;
+    this.saveLocal(STORAGE_KEYS.EVENTS, this.events);
+    this.saveLocal(STORAGE_KEYS.TEAMS, this.teams);
+    this.saveLocal(STORAGE_KEYS.CLUBS, this.clubs);
+  }
+
+  cloneState(state) {
+    return JSON.parse(JSON.stringify(state));
+  }
+
+  statesEqual(first, second) {
+    return JSON.stringify(first) === JSON.stringify(second);
+  }
+
+  mergeCollection(baseCollection, localCollection, remoteCollection) {
+    const base = new Map(baseCollection.map(item => [item.id, item]));
+    const local = new Map(localCollection.map(item => [item.id, item]));
+    const remote = new Map(remoteCollection.map(item => [item.id, item]));
+    const ids = [...local.keys(), ...remote.keys()];
+    const uniqueIds = [...new Set(ids)];
+
+    return uniqueIds.reduce((merged, id) => {
+      const baseItem = base.get(id);
+      const localItem = local.get(id);
+      const remoteItem = remote.get(id);
+      const localChanged = !this.statesEqual(localItem, baseItem);
+      const remoteChanged = !this.statesEqual(remoteItem, baseItem);
+
+      let selected;
+      if (!localChanged) selected = remoteItem;
+      else if (!remoteChanged) selected = localItem;
+      else if (!localItem || !remoteItem) selected = localItem;
+      else selected = { ...remoteItem, ...localItem };
+
+      if (selected) merged.push(selected);
+      return merged;
+    }, []);
+  }
+
+  mergeStates(baseState, localState, remoteState) {
+    return {
+      events: this.mergeCollection(baseState.events, localState.events, remoteState.events),
+      teams: this.mergeCollection(baseState.teams, localState.teams, remoteState.teams),
+      clubs: this.mergeCollection(baseState.clubs, localState.clubs, remoteState.clubs)
+    };
+  }
+
+  notifySharedDataChanged() {
+    window.dispatchEvent(new CustomEvent('storage-manager-updated'));
+  }
+
+  async startSharedSync() {
+    await this.fetchSharedState(true);
+    if (!this.remoteEnabled || this.remotePollTimer) return;
+
+    this.remotePollTimer = window.setInterval(() => {
+      if (!this.remoteSyncPending && !this.remoteSyncInFlight) this.fetchSharedState(false);
+    }, 8000);
+
+    window.addEventListener('focus', () => {
+      if (!this.remoteSyncPending && !this.remoteSyncInFlight) this.fetchSharedState(false);
+    });
+  }
+
+  async fetchSharedState(migrateLocalData) {
+    try {
+      const response = await fetch('/api/state', { cache: 'no-store', credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const sharedState = await response.json();
+      if (!Array.isArray(sharedState.events) || !Array.isArray(sharedState.teams) || !Array.isArray(sharedState.clubs)) {
+        throw new Error('Formato dei dati condivisi non valido.');
+      }
+
+      this.remoteEnabled = true;
+      this.remoteRevision = Number.isInteger(sharedState.version) ? sharedState.version : null;
+      const localState = this.getSharedState();
+      if (migrateLocalData && !this.hasSharedData(sharedState) && this.hasSharedData(localState)) {
+        await this.pushSharedState();
+        return true;
+      }
+
+      const dataChanged = JSON.stringify(sharedState) !== JSON.stringify(localState);
+      if (dataChanged) {
+        this.applySharedState(sharedState);
+        this.lastSharedState = this.cloneState(this.getSharedState());
+        this.notifySharedDataChanged();
+      } else {
+        this.lastSharedState = this.cloneState(sharedState);
+      }
+      return true;
+    } catch (error) {
+      // The page can still be opened as a static preview; in that case it keeps
+      // working locally, but shared persistence is available only through server.js.
+      this.remoteEnabled = false;
+      return false;
+    }
+  }
+
+  queueRemoteSync() {
+    if (!this.remoteEnabled) return;
+    this.remoteSyncPending = true;
+    window.clearTimeout(this.remoteSaveTimer);
+    this.remoteSaveTimer = window.setTimeout(() => this.pushSharedState(), 250);
+  }
+
+  async pushSharedState() {
+    if (!this.remoteEnabled || this.remoteSyncInFlight) return;
+    this.remoteSyncPending = false;
+    this.remoteSyncInFlight = true;
+    try {
+      const response = await fetch('/api/state', {
+        method: 'PUT',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...this.getSharedState(), baseVersion: this.remoteRevision })
+      });
+      if (response.status === 409) {
+        const latest = await response.json();
+        if (!latest.state || !Array.isArray(latest.state.events) || !Array.isArray(latest.state.teams) || !Array.isArray(latest.state.clubs)) {
+          throw new Error('Conflitto dati non risolvibile');
+        }
+        const mergedState = this.mergeStates(
+          this.lastSharedState || latest.state,
+          this.getSharedState(),
+          latest.state
+        );
+        this.applySharedState(mergedState);
+        this.lastSharedState = this.cloneState(latest.state);
+        this.remoteRevision = latest.version;
+        this.remoteSyncPending = true;
+        this.queueRemoteSync();
+        return;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const saved = await response.json();
+      if (saved.state) this.lastSharedState = this.cloneState(saved.state);
+      if (Number.isInteger(saved.version)) this.remoteRevision = saved.version;
+    } catch (error) {
+      this.remoteEnabled = false;
+      this.remoteSyncPending = true;
+    } finally {
+      this.remoteSyncInFlight = false;
     }
   }
 

@@ -21,7 +21,19 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('hashchange', handleHashRouting);
 
   setupFilters();
+
+  // The server is the shared source of truth. Existing local browser data is
+  // migrated only when the shared data folder is still empty.
+  window.addEventListener('storage-manager-updated', refreshSharedDataView);
+  window.storageManager.startSharedSync();
 });
+
+function refreshSharedDataView() {
+  // Do not replace text while someone is filling in a form.
+  const activeElement = document.activeElement;
+  if (activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName)) return;
+  handleHashRouting();
+}
 
 /* ==========================================================================
    1. THEME TOGGLE (DEFAULT LIGHT MODE)

@@ -120,8 +120,6 @@ function navigateToTab(tabName) {
 
 function initNavigation() {
   const navLinks = document.querySelectorAll('.nav-link');
-  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-  const navLinksContainer = document.getElementById('navLinks');
 
   navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
@@ -132,12 +130,6 @@ function initNavigation() {
       }
     });
   });
-
-  if (mobileMenuBtn && navLinksContainer) {
-    mobileMenuBtn.addEventListener('click', () => {
-      navLinksContainer.classList.toggle('active');
-    });
-  }
 }
 
 /* ==========================================================================

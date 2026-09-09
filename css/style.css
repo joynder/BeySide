@@ -1016,26 +1016,72 @@ textarea.form-control {
   }
 
   /* --- Navigation --- */
-  .nav-links {
-    display: none;
-    position: absolute;
-    top: 64px;
-    left: 0;
-    right: 0;
-    width: 100%;
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    flex-direction: column;
-    padding: 0.75rem;
-    box-sizing: border-box;
+  .header-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand actions"
+      "navigation navigation";
+    height: auto;
+    min-height: 64px;
+    padding-top: 0.55rem;
+    padding-bottom: 0.5rem;
+    row-gap: 0.55rem;
   }
 
-  .nav-links.active {
-    display: flex;
+  .brand-logo {
+    grid-area: brand;
+  }
+
+  .main-nav {
+    display: contents;
+  }
+
+  .nav-actions {
+    grid-area: actions;
+  }
+
+  .theme-toggle-btn {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.72rem;
+  }
+
+  .nav-links {
+    grid-area: navigation;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.3rem;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 0.5rem 0.2rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: 0.62rem;
+    letter-spacing: 0;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .nav-link.active {
+    border-color: var(--accent-blue);
   }
 
   .mobile-menu-btn {
-    display: block;
+    display: none;
+  }
+
+  @media (max-width: 360px) {
+    .nav-links {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .nav-link {
+      font-size: 0.7rem;
+    }
   }
 
   /* --- Container padding reduced on small screens --- */

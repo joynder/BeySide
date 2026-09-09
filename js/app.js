@@ -399,6 +399,9 @@ function showTournamentDetailView(eventId) {
     return;
   }
 
+  // Keep the exact event associated with the poster and its download button.
+  window.currentDetailEvent = evt;
+
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
@@ -1015,48 +1018,21 @@ function dataURItoBlob(dataURI) {
 
 function downloadPosterImage() {
   const evt = window.currentDetailEvent;
-  const fileName = evt 
-    ? `beyside_${(evt.title || 'torneo').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_4x5.png` 
-    : 'beyside_locandina_4x5.png';
-
-  const eventToDraw = evt || {
-    title: 'BEYSIDE CUP',
-    organizingClub: 'Milano BeyBlade Club',
-    date: '2026-10-15',
-    time: '10:00',
-    venue: 'Esports Arena',
-    fee: '15',
-    maxTeams: 16
-  };
-
-  const coverUrl = eventToDraw.coverImage || '';
-
-  // Ensure the cover for this event is loaded (it should already be from preloadAllCovers)
-  const cacheKey = coverCacheKey(coverUrl || (eventToDraw.id || eventToDraw.title));
-  const coverImg = loadedLocalImages[cacheKey];
-
-  function drawAndDownload() {
-    const offscreen = document.createElement('canvas');
-    offscreen.width = 800;
-    offscreen.height = 1000;
-    const ctx = offscreen.getContext('2d');
-    drawIMLStylePosterOnContext(ctx, eventToDraw, true);
-    try {
-      const dataUri = offscreen.toDataURL('image/png');
-      triggerPosterDownload(dataUri, fileName);
-      showToast('Locandina scaricata con successo!', 'success');
-    } catch (e) {
-      console.error('Canvas export failed:', e);
-      showToast('Errore durante il download. Prova a ricaricare la pagina.', 'error');
-    }
+  const posterCanvas = document.getElementById('posterCanvas');
+  if (!evt || !posterCanvas) {
+    showToast('Apri prima la pagina del torneo da scaricare.', 'error');
+    return;
   }
 
-  if (coverImg) {
-    // Image already in cache (embedded covers loaded at startup) — draw immediately
-    drawAndDownload();
-  } else {
-    // Not yet loaded — trigger load then draw
-    getLocalCoverImage(coverUrl || (eventToDraw.id || eventToDraw.title), () => drawAndDownload());
+  const fileName = `beyside_${(evt.title || 'torneo').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_4x5.png`;
+  try {
+    // Export the same canvas visible in the page: no second rendering can
+    // accidentally fall back to the default BeySide Cup poster.
+    triggerPosterDownload(posterCanvas.toDataURL('image/png'), fileName);
+    showToast('Locandina scaricata con successo!', 'success');
+  } catch (error) {
+    console.error('Canvas export failed:', error);
+    showToast('Errore durante il download. Prova a ricaricare la pagina.', 'error');
   }
 }
 

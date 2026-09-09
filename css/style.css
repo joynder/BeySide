@@ -511,6 +511,9 @@ button {
 }
 
 .team-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   font-weight: 800;
   font-size: 0.95rem;
   max-width: 260px;
@@ -808,6 +811,28 @@ button {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.standings-team-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.standings-team-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .admin-row-actions {
@@ -1207,30 +1232,75 @@ textarea.form-control {
     line-height: 1.2;
   }
 
+  .admin-actions-group .btn:first-child,
+  .admin-actions-group .btn:last-child {
+    grid-column: 1 / -1;
+  }
+
   .admin-table-wrap {
-    border-radius: var(--radius-md);
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+    width: 100%;
+    max-width: none;
   }
 
   .admin-table {
-    min-width: 680px;
-    width: max-content;
-    max-width: none;
-    table-layout: auto;
+    min-width: 0;
+    background: transparent;
   }
 
-  .admin-table th,
-  .admin-table td {
-    padding: 0.7rem 0.8rem;
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table .admin-data-row {
+    box-sizing: border-box;
+    margin-bottom: 0.75rem;
+    padding: 0.2rem 0.85rem;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+  }
+
+  .admin-table .admin-data-row td {
+    box-sizing: border-box;
+    padding: 0.65rem 0;
     overflow: visible;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
     text-overflow: clip;
     white-space: normal;
-    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-table .admin-data-row td:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-table .admin-data-row td::before {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    content: attr(data-label);
   }
 
   .admin-table td.actions-cell,
   .admin-table td:last-child,
   .admin-table th:last-child {
-    white-space: normal !important;
     text-align: left;
   }
 
@@ -1242,9 +1312,91 @@ textarea.form-control {
 
   .admin-row-actions .btn,
   .admin-table td.actions-cell > .btn {
-    min-height: 34px;
-    padding: 0.45rem 0.6rem;
+    min-height: 38px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  .admin-table td.actions-cell > .btn {
+    width: 100%;
+  }
+
+  .standings-table-wrap {
+    overflow: hidden;
+  }
+
+  .standings-table {
+    width: 100%;
+    table-layout: fixed;
     font-size: 0.72rem;
+  }
+
+  .standings-table th,
+  .standings-table td {
+    padding: 0.55rem 0.25rem;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+  }
+
+  .standings-table th:nth-child(1),
+  .standings-table td:nth-child(1) { width: 9%; }
+  .standings-table th:nth-child(2),
+  .standings-table td:nth-child(2) { width: 45%; text-align: left; }
+  .standings-table th:nth-child(3),
+  .standings-table td:nth-child(3) { width: 14%; }
+  .standings-table th:nth-child(4),
+  .standings-table td:nth-child(4) { width: 13%; }
+  .standings-table th:nth-child(5),
+  .standings-table td:nth-child(5) { width: 19%; }
+
+  .standings-table th {
+    font-size: 0.58rem;
+    letter-spacing: 0;
+    white-space: normal;
+  }
+
+  .rank-number {
+    font-size: 0.78rem;
+  }
+
+  .team-name-cell {
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    white-space: normal;
+  }
+
+  .team-name-cell > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .team-tag-badge {
+    display: block;
+    margin: 0.1rem 0 0;
+    font-size: 0.6rem;
+  }
+
+  .standings-team-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.58rem;
+  }
+
+  .standings-table td:nth-child(2) > div:last-child {
+    display: none;
+  }
+
+  .standings-table .btn {
+    min-height: 32px;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .standings-table tr[id^="roster-row-"] td {
+    width: 100% !important;
+    padding: 0.8rem;
+    text-align: left;
   }
 
   #gestionaleTab h3 {

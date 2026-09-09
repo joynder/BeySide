@@ -1018,7 +1018,7 @@ function dataURItoBlob(dataURI) {
   return new Blob([ab], { type: mimeString });
 }
 
-function downloadPosterImage(downloadButton) {
+async function downloadPosterImage(downloadButton) {
   const eventId = downloadButton?.dataset?.eventId || new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
   const evt = eventId ? window.storageManager.getEventById(eventId) : window.currentDetailEvent;
   const posterCanvas = document.getElementById('posterCanvas');
@@ -1031,9 +1031,24 @@ function downloadPosterImage(downloadButton) {
   try {
     // Export the exact canvas visible in the page. The event id is kept on
     // the button too, which is more reliable than a global variable on mobile browsers.
-    triggerPosterDownload(posterCanvas.toDataURL('image/png'), fileName);
+    const dataUri = posterCanvas.toDataURL('image/png');
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+    // Mobile browsers cannot write directly into the Gallery. The native share
+    // sheet offers "Save image" and preserves the PNG as a proper photo.
+    if (isMobile && navigator.share && typeof File !== 'undefined') {
+      const imageFile = new File([dataURItoBlob(dataUri)], fileName, { type: 'image/png' });
+      if (!navigator.canShare || navigator.canShare({ files: [imageFile] })) {
+        await navigator.share({ files: [imageFile], title: evt.title || 'Locandina BeySide' });
+        showToast('Scegli “Salva immagine” per aggiungerla alla galleria.', 'success');
+        return;
+      }
+    }
+
+    triggerPosterDownload(dataUri, fileName);
     showToast('Locandina scaricata con successo!', 'success');
   } catch (error) {
+    if (error && error.name === 'AbortError') return;
     console.error('Canvas export failed:', error);
     showToast('Errore durante il download. Prova a ricaricare la pagina.', 'error');
   }
@@ -1068,6 +1083,15 @@ function triggerPosterDownload(dataUri, fileName) {
 /* ==========================================================================
    7. CLASSIFICA (NICKNAME PROMINENCE)
    ========================================================================== */
+function renderStandingsTeamIcon(team) {
+  const icon = team.iconUrl || team.tag || team.name || '?';
+  const imageSource = typeof icon === 'string' && /^(https?:\/\/|data:image\/)/i.test(icon);
+  if (imageSource) {
+    return `<span class="standings-team-icon"><img src="${escapeHtml(icon)}" alt=""></span>`;
+  }
+  return `<span class="standings-team-icon">${escapeHtml(String(icon).slice(0, 2).toUpperCase())}</span>`;
+}
+
 function renderClassifica() {
   const tableBody = document.getElementById('standingsTableBody');
   if (!tableBody) return;
@@ -1085,7 +1109,7 @@ function renderClassifica() {
   if (filteredTeams.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
           Nessuna squadra trovata nella classifica.
         </td>
       </tr>
@@ -1095,23 +1119,21 @@ function renderClassifica() {
 
   tableBody.innerHTML = filteredTeams.map((team, idx) => `
     <tr>
-      <td><span class="rank-number">#${idx + 1}</span></td>
-      <td>
-        <div class="team-name-cell">${escapeHtml(team.name)} <span class="team-tag-badge">[${escapeHtml(team.tag)}]</span></div>
+      <td data-label="Posizione"><span class="rank-number">#${idx + 1}</span></td>
+      <td data-label="Squadra">
+        <div class="team-name-cell">${renderStandingsTeamIcon(team)}<span>${escapeHtml(team.name)} <span class="team-tag-badge">[${escapeHtml(team.tag)}]</span></span></div>
         <div style="font-size:0.75rem; color:var(--text-muted);">Capitano: ${escapeHtml(team.captain)} ${team.city ? `(${escapeHtml(team.city)})` : ''}</div>
       </td>
-      <td><strong>${team.points || 0} PTS</strong></td>
-      <td>${team.played || 0}</td>
-      <td>${team.wins || 0}</td>
-      <td>${team.losses || 0}</td>
-      <td>
+      <td data-label="Punti"><strong>${team.points || 0} PTS</strong></td>
+      <td data-label="Giocate">${team.played || 0}</td>
+      <td data-label="Roster">
         <button class="btn btn-secondary btn-sm" onclick="toggleRosterView('${team.id}')">
-          Vedi Roster
+          Vedi
         </button>
       </td>
     </tr>
     <tr id="roster-row-${team.id}" style="display: none; background-color: var(--bg-input);">
-      <td colspan="7" style="padding: 1rem;">
+      <td colspan="5" style="padding: 1rem;">
         <div style="font-size:0.8rem; font-weight:800; text-transform:uppercase; margin-bottom:0.4rem;">
           Roster Giocatori (${(team.players || []).length}/5):
         </div>
@@ -1158,17 +1180,17 @@ function renderAdminTable() {
         const registeredCount = (evt.registeredTeamIds || []).length;
         const statusClass = evt.status === 'concluso' ? 'concluso' : (evt.status === 'in_corso' ? 'in_corso' : 'aperto');
         return `
-          <tr>
-            <td>
+          <tr class="admin-data-row">
+            <td data-label="Torneo">
               <a href="#torneo-detail?id=${evt.id}" onclick="openTournamentDetailPage('${evt.id}')" style="cursor:pointer; color:var(--text-main); font-weight:800; text-decoration:underline;">
                 ${escapeHtml(evt.title)}
               </a>
             </td>
-            <td>${escapeHtml(evt.organizingClub || 'BeySide Club')}</td>
-            <td>${formatDate(evt.date)} ${escapeHtml(evt.time || '')}</td>
-            <td><span class="status-badge ${statusClass}">[${(evt.status || 'aperto').toUpperCase()}]</span></td>
-            <td><strong>${registeredCount} / ${evt.maxTeams}</strong> Squadre</td>
-            <td class="actions-cell">
+            <td data-label="Club">${escapeHtml(evt.organizingClub || 'BeySide Club')}</td>
+            <td data-label="Data">${formatDate(evt.date)} ${escapeHtml(evt.time || '')}</td>
+            <td data-label="Stato"><span class="status-badge ${statusClass}">[${(evt.status || 'aperto').toUpperCase()}]</span></td>
+            <td data-label="Squadre"><strong>${registeredCount} / ${evt.maxTeams}</strong> Squadre</td>
+            <td class="actions-cell" data-label="Azioni">
               <div class="admin-row-actions">
                 <button class="btn btn-secondary btn-sm" onclick="editEvent('${evt.id}')">Modifica</button>
                 <button class="btn btn-danger btn-sm" onclick="confirmDeleteEvent('${evt.id}')">Elimina</button>
@@ -1193,12 +1215,12 @@ function renderAdminTable() {
       `;
     } else {
       teamsTableBody.innerHTML = teams.map(team => `
-        <tr>
-          <td><strong>${escapeHtml(team.name)}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">[${escapeHtml(team.tag)}]</span></td>
-          <td>${escapeHtml(team.captain)} (${escapeHtml(team.email || 'N/A')})</td>
-          <td>${escapeHtml(team.city || 'N/A')}</td>
-          <td><strong>${team.points || 0} PTS</strong> (${team.wins || 0}V / ${team.losses || 0}P)</td>
-          <td class="actions-cell">
+        <tr class="admin-data-row">
+          <td data-label="Squadra"><strong>${escapeHtml(team.name)}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">[${escapeHtml(team.tag)}]</span></td>
+          <td data-label="Capitano">${escapeHtml(team.captain)} (${escapeHtml(team.email || 'N/A')})</td>
+          <td data-label="Città">${escapeHtml(team.city || 'N/A')}</td>
+          <td data-label="Punti"><strong>${team.points || 0} PTS</strong> (${team.wins || 0}V / ${team.losses || 0}P)</td>
+          <td class="actions-cell" data-label="Azioni">
             <button class="btn btn-danger btn-sm" onclick="deleteTeamFromAdmin('${team.id}')">
               Elimina Squadra
             </button>
@@ -1221,10 +1243,10 @@ function renderAdminTable() {
       `;
     } else {
       clubsTableBody.innerHTML = clubs.map(club => `
-        <tr>
-          <td><strong>${escapeHtml(club.name)}</strong></td>
-          <td>${escapeHtml(club.city || 'N/A')}</td>
-          <td class="actions-cell">
+        <tr class="admin-data-row">
+          <td data-label="Club"><strong>${escapeHtml(club.name)}</strong></td>
+          <td data-label="Città">${escapeHtml(club.city || 'N/A')}</td>
+          <td class="actions-cell" data-label="Azioni">
             <button class="btn btn-danger btn-sm" onclick="deleteClubFromAdmin('${club.id}')">
               Elimina Club
             </button>

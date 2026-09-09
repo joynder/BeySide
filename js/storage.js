@@ -15,6 +15,13 @@ const DEFAULT_CLUBS = [];
 const DEFAULT_TEAMS = [];
 const DEFAULT_EVENTS = [];
 
+// Questa è una chiave "publishable": è prevista per essere inclusa nel sito.
+// La sicurezza effettiva è definita dalle policy SQL in supabase-setup.sql.
+const SUPABASE_URL = 'https://vbtlxeelyhxudioycgzj.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlLCN_J8yLYyBJlO0XFIYA_w1PPmTsg';
+const SUPABASE_STATE_TABLE = 'beyside_state';
+const SUPABASE_STATE_ID = 'global';
+
 class StorageManager {
   constructor() {
     this.events = [];
@@ -24,10 +31,11 @@ class StorageManager {
     this.remoteEnabled = false;
     this.remoteSyncPending = false;
     this.remoteSyncInFlight = false;
-    this.remotePollTimer = null;
     this.remoteSaveTimer = null;
-    this.remoteRevision = null;
+    this.remoteVersion = null;
     this.lastSharedState = null;
+    this.supabaseClient = null;
+    this.syncStarted = false;
     this.initSynchronous();
   }
 
@@ -173,31 +181,51 @@ class StorageManager {
     window.dispatchEvent(new CustomEvent('storage-manager-updated'));
   }
 
-  async startSharedSync() {
-    await this.fetchSharedState(true);
-    if (!this.remoteEnabled || this.remotePollTimer) return;
-
-    this.remotePollTimer = window.setInterval(() => {
-      if (!this.remoteSyncPending && !this.remoteSyncInFlight) this.fetchSharedState(false);
-    }, 8000);
-
-    window.addEventListener('focus', () => {
-      if (!this.remoteSyncPending && !this.remoteSyncInFlight) this.fetchSharedState(false);
+  getSupabaseClient() {
+    if (this.supabaseClient) return this.supabaseClient;
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      throw new Error('La libreria Supabase non è stata caricata.');
+    }
+    this.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
     });
+    return this.supabaseClient;
+  }
+
+  async startSharedSync() {
+    if (this.syncStarted) return;
+    this.syncStarted = true;
+    try {
+      this.getSupabaseClient();
+      await this.fetchSharedState(true);
+      if (!this.remoteEnabled) return;
+      this.subscribeToSharedState();
+
+      window.addEventListener('focus', () => {
+        if (!this.remoteSyncPending && !this.remoteSyncInFlight) this.fetchSharedState(false);
+      });
+    } catch (error) {
+      this.remoteEnabled = false;
+      console.warn('Sincronizzazione Supabase non disponibile:', error.message);
+    }
   }
 
   async fetchSharedState(migrateLocalData) {
     try {
-      const response = await fetch('/api/state', { cache: 'no-store', credentials: 'same-origin' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const { data, error } = await this.getSupabaseClient()
+        .from(SUPABASE_STATE_TABLE)
+        .select('state, version')
+        .eq('id', SUPABASE_STATE_ID)
+        .single();
+      if (error) throw error;
 
-      const sharedState = await response.json();
-      if (!Array.isArray(sharedState.events) || !Array.isArray(sharedState.teams) || !Array.isArray(sharedState.clubs)) {
+      const sharedState = data && data.state;
+      if (!sharedState || !Array.isArray(sharedState.events) || !Array.isArray(sharedState.teams) || !Array.isArray(sharedState.clubs)) {
         throw new Error('Formato dei dati condivisi non valido.');
       }
 
       this.remoteEnabled = true;
-      this.remoteRevision = Number.isInteger(sharedState.version) ? sharedState.version : null;
+      this.remoteVersion = Number.isInteger(data.version) ? data.version : null;
       const localState = this.getSharedState();
       if (migrateLocalData && !this.hasSharedData(sharedState) && this.hasSharedData(localState)) {
         await this.pushSharedState();
@@ -214,11 +242,33 @@ class StorageManager {
       }
       return true;
     } catch (error) {
-      // The page can still be opened as a static preview; in that case it keeps
-      // working locally, but shared persistence is available only through server.js.
       this.remoteEnabled = false;
-      return false;
+      throw error;
     }
+  }
+
+  subscribeToSharedState() {
+    this.getSupabaseClient()
+      .channel('beyside-state-realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: SUPABASE_STATE_TABLE,
+        filter: `id=eq.${SUPABASE_STATE_ID}`
+      }, payload => {
+        if (this.remoteSyncPending || this.remoteSyncInFlight) return;
+        const nextState = payload.new && payload.new.state;
+        if (!nextState || !Array.isArray(nextState.events) || !Array.isArray(nextState.teams) || !Array.isArray(nextState.clubs)) return;
+
+        const dataChanged = !this.statesEqual(nextState, this.getSharedState());
+        this.remoteVersion = payload.new.version;
+        this.lastSharedState = this.cloneState(nextState);
+        if (dataChanged) {
+          this.applySharedState(nextState);
+          this.notifySharedDataChanged();
+        }
+      })
+      .subscribe();
   }
 
   queueRemoteSync() {
@@ -233,40 +283,60 @@ class StorageManager {
     this.remoteSyncPending = false;
     this.remoteSyncInFlight = true;
     try {
-      const response = await fetch('/api/state', {
-        method: 'PUT',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...this.getSharedState(), baseVersion: this.remoteRevision })
-      });
-      if (response.status === 409) {
-        const latest = await response.json();
-        if (!latest.state || !Array.isArray(latest.state.events) || !Array.isArray(latest.state.teams) || !Array.isArray(latest.state.clubs)) {
-          throw new Error('Conflitto dati non risolvibile');
-        }
-        const mergedState = this.mergeStates(
-          this.lastSharedState || latest.state,
-          this.getSharedState(),
-          latest.state
-        );
-        this.applySharedState(mergedState);
-        this.lastSharedState = this.cloneState(latest.state);
-        this.remoteRevision = latest.version;
-        this.remoteSyncPending = true;
-        this.queueRemoteSync();
+      const stateToSave = this.cloneState(this.getSharedState());
+      const versionToSave = this.remoteVersion;
+      if (!Number.isInteger(versionToSave)) throw new Error('Versione dei dati condivisi non disponibile.');
+
+      const { data, error } = await this.getSupabaseClient()
+        .from(SUPABASE_STATE_TABLE)
+        .update({
+          state: stateToSave,
+          version: versionToSave + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', SUPABASE_STATE_ID)
+        .eq('version', versionToSave)
+        .select('state, version');
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        await this.resolveWriteConflict();
         return;
       }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const saved = await response.json();
-      if (saved.state) this.lastSharedState = this.cloneState(saved.state);
-      if (Number.isInteger(saved.version)) this.remoteRevision = saved.version;
+
+      this.lastSharedState = this.cloneState(data[0].state);
+      this.remoteVersion = data[0].version;
     } catch (error) {
       this.remoteEnabled = false;
       this.remoteSyncPending = true;
+      console.warn('Impossibile salvare su Supabase:', error.message);
     } finally {
       this.remoteSyncInFlight = false;
+      if (this.remoteSyncPending && this.remoteEnabled) this.queueRemoteSync();
     }
+  }
+
+  async resolveWriteConflict() {
+    const { data, error } = await this.getSupabaseClient()
+      .from(SUPABASE_STATE_TABLE)
+      .select('state, version')
+      .eq('id', SUPABASE_STATE_ID)
+      .single();
+    if (error) throw error;
+
+    const latestState = data.state;
+    if (!latestState || !Array.isArray(latestState.events) || !Array.isArray(latestState.teams) || !Array.isArray(latestState.clubs)) {
+      throw new Error('Conflitto dati non risolvibile.');
+    }
+    const mergedState = this.mergeStates(
+      this.lastSharedState || latestState,
+      this.getSharedState(),
+      latestState
+    );
+    this.applySharedState(mergedState);
+    this.lastSharedState = this.cloneState(latestState);
+    this.remoteVersion = data.version;
+    this.remoteSyncPending = true;
   }
 
   /* CLUBS MANAGEMENT */

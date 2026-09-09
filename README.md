@@ -1,15 +1,9 @@
 # BeySide
 
-## Dati condivisi tra dispositivi
+## Pubblicazione su GitHub Pages
 
-Il sito non va aperto con `file://` né pubblicato su GitHub Pages: entrambi sono statici e non possono scrivere i dati del torneo. Avvialo invece nella cartella del progetto con Node.js 18 o successivo:
+Il sito è pronto per GitHub Pages. I dati di tornei, squadre e club sono salvati in Supabase e gli aggiornamenti arrivano in tempo reale a tutti i dispositivi con il sito aperto.
 
-```powershell
-npm start
-```
+Prima della prima pubblicazione, esegui il contenuto di `supabase-setup.sql` nel pannello **SQL Editor** del progetto Supabase. Poi pubblica normalmente il branch `main` con GitHub Pages.
 
-Apri `http://localhost:3000`. Dagli altri dispositivi collegati alla stessa rete apri `http://IP-DEL-COMPUTER:3000` (consentendo la porta 3000 nel firewall di Windows, se richiesta).
-
-Ogni modifica viene salvata dal server nei file `data/events.json`, `data/teams.json` e `data/clubs.json` dentro questa cartella Git. Gli altri dispositivi aggiornano automaticamente i dati entro pochi secondi o quando tornano alla pagina.
-
-Le modifiche ai JSON restano modifiche locali del repository: usa normalmente Git per verificarle, farne il commit e inviarle quando desideri conservarne una versione nel remoto.
+Non servono Node.js, server locali o file JSON da mantenere allineati.

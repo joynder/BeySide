@@ -127,15 +127,20 @@ class StorageManager {
       return { success: false, message: 'Un account con questa email esiste già.' };
     }
 
+    const cleanTag = (tag || '').trim().toUpperCase();
+    if (cleanTag.length !== 3) {
+      return { success: false, message: 'Il TAG deve essere esattamente 3 lettere.' };
+    }
+
     const newTeam = {
       id: 'team-' + Date.now(),
       name: teamName,
-      tag: (tag || teamName.substring(0, 3)).toUpperCase(),
+      tag: cleanTag,
       captain: captain || 'Capitano',
       email: email.toLowerCase(),
       password: password,
       city: city || '',
-      iconUrl: iconUrl || tag.substring(0, 1) || teamName.substring(0, 1),
+      iconUrl: iconUrl || cleanTag.substring(0, 1) || teamName.substring(0, 1),
       points: 0,
       played: 0,
       wins: 0,

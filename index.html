@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('beyside_theme_v6') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeySide - Beyblade X League & Tournament Manager</title>
+  <meta name="description" content="Piattaforma tornei ed eventi a squadre Beyblade X con Round Robin, Club Organizzatori e Locandine 4:5.">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- =================================================================== -->
+  <!-- HEADER & NAVIGATION                                                 -->
+  <!-- =================================================================== -->
+  <header class="site-header">
+    <div class="container header-container">
+      <a href="#eventi" class="brand-logo" onclick="navigateToTab('eventi')">
+        BEY<span class="logo-blue">SIDE</span>
+      </a>
+
+      <nav class="main-nav">
+        <ul class="nav-links" id="navLinks">
+          <li><a href="#eventi" class="nav-link active" data-tab="eventi">EVENTI</a></li>
+          <li><a href="#classifica" class="nav-link" data-tab="classifica">CLASSIFICA</a></li>
+          <li><a href="#area-team" class="nav-link" data-tab="area-team">AREA TEAM</a></li>
+          <li><a href="#gestionale" class="nav-link" data-tab="gestionale">ADMIN</a></li>
+        </ul>
+
+        <div class="nav-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Cambia modalità giorno/notte">
+            <span id="themeLabel">[GIORNO]</span>
+          </button>
+
+          <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">MENU</button>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- =================================================================== -->
+  <!-- MAIN CONTENT CONTAINER                                              -->
+  <!-- =================================================================== -->
+  <main class="main-content container">
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- TAB 1: EVENTI (DEFAULT LANDING PAGE WITH CREATION BUTTON)         -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="tab-pane active" id="eventiTab">
+      <div class="section-header">
+        <div class="section-title-group">
+          <h2>Tornei & Eventi Ufficiali</h2>
+          <p>Seleziona un torneo per aprire la pagina dedicata con locandina 4:5, tabellone Round Robin ed iscrizioni.</p>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="openCreateEventModal()">
+            + Nuovo Torneo
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="search-input-wrap">
+          <input type="text" id="eventSearchInput" placeholder="Cerca torneo per nome, club organizzatore, luogo o città...">
+        </div>
+        <div>
+          <select id="eventStatusFilter" class="filter-select">
+            <option value="all">Tutti gli stati</option>
+            <option value="aperto">Iscrizioni Aperte</option>
+            <option value="in_corso">In Corso</option>
+            <option value="concluso">Conclusi</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cards-grid" id="eventsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- TAB 2: CLASSIFICA                                                 -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="tab-pane" id="classificaTab">
+      <div class="section-header">
+        <div class="section-title-group">
+          <h2>Classifica Generale Squadre</h2>
+          <p>Classifica ufficiale dei team Beyblade X. Clicca su una squadra per visualizzarne il roster dei giocatori.</p>
+        </div>
+        <button class="btn btn-primary" onclick="navigateToTab('area-team')">
+          Registra la tua Squadra
+        </button>
+      </div>
+
+      <div class="filter-bar">
+        <div class="search-input-wrap">
+          <input type="text" id="standingsSearchInput" placeholder="Cerca squadra nella classifica per nome, tag, capitano o città...">
+        </div>
+      </div>
+
+      <div class="standings-table-wrap">
+        <table class="standings-table">
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Squadra / TAG</th>
+              <th>Punti</th>
+              <th>Giocate</th>
+              <th>Vittorie</th>
+              <th>Sconfitte</th>
+              <th>Roster</th>
+            </tr>
+          </thead>
+          <tbody id="standingsTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- TAB 3: AREA RISERVATA TEAM (LOGIN / REGISTRAZIONE / DASHBOARD)    -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="tab-pane" id="area-teamTab">
+      <!-- Unauthenticated View: Login & Registration forms -->
+      <div class="team-auth-grid" id="teamAuthContainer">
+        <!-- Login Card -->
+        <div class="auth-card">
+          <h3 class="auth-card-title">Login Capitano Team</h3>
+          <form id="teamLoginForm">
+            <div class="form-group">
+              <label class="form-label">Email Capitano</label>
+              <input type="email" id="loginEmailInput" class="form-control" placeholder="marco.rossi@email.it" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" id="loginPasswordInput" class="form-control" placeholder="Password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Accedi alla Squadra</button>
+          </form>
+          <div style="margin-top:1rem; font-size:0.8rem; color:var(--text-muted);">
+            Account Demo: <strong>marco.rossi@email.it</strong> / <strong>password123</strong>
+          </div>
+        </div>
+
+        <!-- Registration Card -->
+        <div class="auth-card">
+          <h3 class="auth-card-title">Registra Nuova Squadra</h3>
+          <form id="teamRegisterForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Email Capitano <span class="required">*</span></label>
+                <input type="email" id="regEmailInput" class="form-control" placeholder="capitano@email.it" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password <span class="required">*</span></label>
+                <input type="password" id="regPasswordInput" class="form-control" placeholder="Crea Password" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nome Squadra <span class="required">*</span></label>
+                <input type="text" id="regTeamNameInput" class="form-control" placeholder="Es. Dragoon Knights" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">TAG (2-4 lettere)</label>
+                <input type="text" id="regTagInput" class="form-control" placeholder="Es. DGK" maxlength="4">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nome Capitano <span class="required">*</span></label>
+                <input type="text" id="regCaptainInput" class="form-control" placeholder="Es. Marco Rossi" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Città</label>
+                <input type="text" id="regCityInput" class="form-control" placeholder="Es. Milano">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Icona / Avatar Team (URL Immagine o Lettera)</label>
+              <input type="text" id="regIconInput" class="form-control" placeholder="Es. https://... oppure X">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;">Registra Squadra & Crea Account</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Authenticated View: Captain Dashboard -->
+      <div id="teamDashboardContainer" style="display:none;">
+        <div class="dashboard-card">
+          <div class="dashboard-header">
+            <div class="team-profile-header">
+              <div class="team-avatar-box" id="dashAvatarBox">X</div>
+              <div>
+                <h2 style="font-size: 1.5rem; text-transform: uppercase;">
+                  <span id="dashTeamName"></span> <span id="dashTeamTag" style="color:var(--accent-blue);"></span>
+                </h2>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">
+                  Capitano: <strong id="dashCaptainName" style="color:var(--text-main);"></strong> | <span id="dashTeamCity"></span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button class="btn btn-danger btn-sm" onclick="deleteCurrentTeamAccount()">
+                Elimina Squadra
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="logoutCaptain()">
+                Logout
+              </button>
+            </div>
+          </div>
+
+          <!-- Profile & Roster Management -->
+          <form id="updateRosterForm">
+            <div class="form-group">
+              <label class="form-label">Icona / Logo Squadra (URL Immagine o Iniziale)</label>
+              <input type="text" id="dashIconInput" class="form-control" placeholder="Es. https://... oppure X">
+            </div>
+
+            <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              Gestione Roster Giocatori (Da 3 a 5 Giocatori)
+            </h3>
+
+            <div id="dashRosterEditor">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <div style="margin-top:1.25rem; display:flex; justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">
+                Salva Modifiche Profilo & Roster
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- TAB 4: ADMIN                                                      -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="tab-pane" id="gestionaleTab">
+      <!-- Admin Login Form (Password Gate) -->
+      <div id="adminAuthContainer" style="max-width: 440px; margin: 2rem auto;">
+        <div class="auth-card">
+          <h3 class="auth-card-title">Accesso Area Riservata Admin</h3>
+          <form id="adminLoginForm" onsubmit="submitAdminLogin(event)">
+            <div class="form-group">
+              <label class="form-label">Password Amministratore <span class="required">*</span></label>
+              <input type="password" id="adminPasswordInput" class="form-control" placeholder="Inserisci Password Admin" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Accedi come Admin</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Authenticated Admin Dashboard -->
+      <div id="adminPanelContainer" style="display:none;" class="admin-container">
+        <div class="admin-banner">
+          <div>
+            <h2 style="font-size: 1.25rem; text-transform: uppercase;">
+              Pannello Amministrazione ADMIN
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+              Gestisci i tornei, registra nuovi Club organizzatori ed esporta i file JSON.
+            </p>
+          </div>
+          <div class="admin-actions-group">
+            <button class="btn btn-primary" onclick="openCreateClubModal()">
+              + Nuovo Club
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="exportData('events')">
+              Esporta events.json
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="exportData('teams')">
+              Esporta teams.json
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="resetData()">
+              Ripristina Dati
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="logoutAdmin()">
+              Logout Admin
+            </button>
+          </div>
+        </div>
+
+        <!-- Clubs Management Table -->
+        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 1rem;">Club Organizzatori Iscritti</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Nome Club</th>
+                <th>Città</th>
+                <th>Azione Admin</th>
+              </tr>
+            </thead>
+            <tbody id="adminClubsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Events Table -->
+        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 2rem;">Gestione Tornei</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Nome Torneo</th>
+                <th>Club Organizzatore</th>
+                <th>Data & Ora</th>
+                <th>Stato</th>
+                <th>Squadre</th>
+                <th>Gestione Admin</th>
+              </tr>
+            </thead>
+            <tbody id="adminEventsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Teams Management Table -->
+        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 2rem;">Gestione Squadre Iscritte al Sito</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Nome Squadra / TAG</th>
+                <th>Capitano & Email</th>
+                <th>Città</th>
+                <th>Punti Classifica</th>
+                <th>Azione Admin</th>
+              </tr>
+            </thead>
+            <tbody id="adminTeamsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- DEDICATED TOURNAMENT DETAIL VIEW WITH LIVE SWISS & DROP           -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="tab-pane" id="torneoDetailView">
+
+
+      <div class="poster-hero-card">
+        <!-- 4:5 Instagram Poster Box -->
+        <div class="poster-container">
+          <div class="poster-canvas-wrap">
+            <canvas id="posterCanvas"></canvas>
+            <button class="btn-download-round poster-download-btn-overlay" onclick="downloadPosterImage()" title="Scarica Locandina 4:5 per Instagram">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tournament Info & Quick Enroll / Drop -->
+        <div class="tournament-info-column">
+          <h2 id="detailTitle"></h2>
+          <div id="detailMeta" class="event-meta-list" style="font-size: 0.95rem;"></div>
+          <p id="detailDescription" style="color: var(--text-muted); font-size: 0.9rem; word-break: break-word; overflow-wrap: anywhere;"></p>
+
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="detailEnrollBtn">
+              Iscrivi la tua Squadra
+            </button>
+            <button class="btn btn-danger" id="detailDropBtn" style="display:none;">
+              Ritira Squadra dal Torneo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE ROUND ROBIN MATCHES INTEGRATED ON TOURNAMENT PAGE -->
+      <div class="swiss-live-container" id="detailSwissContainer">
+        <!-- Rendered dynamically via js/app.js -->
+      </div>
+
+      <!-- Enrolled Teams List -->
+      <div class="enrolled-teams-section" style="margin-top: 2rem;">
+        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-bottom: 1rem;">
+          Squadre Iscritte al Torneo
+        </h3>
+        <div id="detailEnrolledTeamsContainer">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: CREA / MODIFICA EVENTO                                       -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="eventModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="eventModalTitle">Creazione Nuovo Torneo</h3>
+        <button class="modal-close-btn" onclick="closeModal('eventModal')">X</button>
+      </div>
+
+      <form id="eventForm">
+        <input type="hidden" id="eventIdInput">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Titolo Torneo / Evento <span class="required">*</span> <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(max 35 caratteri)</span></label>
+            <input type="text" id="eventTitleInput" class="form-control" placeholder="Es. BeySide Cup Milano" maxlength="35" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Club Organizzatore <span class="required">*</span></label>
+            <select id="eventClubSelect" class="form-control" required>
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Data Evento <span class="required">*</span></label>
+              <input type="date" id="eventDateInput" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ora Inizio <span class="required">*</span></label>
+              <input type="time" id="eventTimeInput" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nome Venue / Location <span class="required">*</span></label>
+              <input type="text" id="eventVenueInput" class="form-control" placeholder="Es. Esports Arena Milano" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Indirizzo & Città</label>
+              <input type="text" id="eventLocationInput" class="form-control" placeholder="Es. Via E. Fermi 12, Milano (MI)">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Quota Iscrizione (€)</label>
+              <input type="text" id="eventFeeInput" class="form-control" placeholder="Es. 15" value="15">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Squadre Ammesse</label>
+              <select id="eventMaxTeamsInput" class="form-control">
+                <option value="4">4 Squadre</option>
+                <option value="8" selected>8 Squadre</option>
+                <option value="16">16 Squadre</option>
+                <option value="32">32 Squadre</option>
+              </select>
+            </div>
+          </div>
+
+
+
+          <div class="form-group">
+            <label class="form-label">Descrizione / Regolamento</label>
+            <textarea id="eventDescriptionInput" class="form-control" rows="3" placeholder="Informazioni sul torneo e regolamento..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('eventModal')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Salva Torneo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: REGISTRA NUOVO CLUB ORGANIZZATORE                           -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="clubModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Registra Nuovo Club Organizzatore</h3>
+        <button class="modal-close-btn" onclick="closeModal('clubModal')">X</button>
+      </div>
+
+      <form id="newClubForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nome Club Organizzatore <span class="required">*</span></label>
+            <input type="text" id="clubNameInput" class="form-control" placeholder="Es. Milano BeyBlade Club" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Città / Sede</label>
+            <input type="text" id="clubCityInput" class="form-control" placeholder="Es. Milano">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('clubModal')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Salva Club</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: ISCRIVI TEAM A TORNEO                                       -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="enrollmentModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Iscrizione Squadra a Torneo</h3>
+        <button class="modal-close-btn" onclick="closeModal('enrollmentModal')">X</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="enrollEventIdHidden">
+        <p style="margin-bottom: 1rem; color: var(--text-muted);">
+          Stai iscrivendo la tua squadra al torneo: <strong id="enrollEventTitle" style="color:var(--text-main);"></strong>
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Seleziona Squadra <span class="required">*</span></label>
+          <select id="enrollTeamSelect" class="form-control">
+            <!-- Options populated dynamically -->
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('enrollmentModal')">Annulla</button>
+        <button type="button" class="btn btn-primary" onclick="submitEnrollment()">Conferma Iscrizione</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p style="font-weight: 700; text-transform: uppercase;">BEYSIDE LEAGUE</p>
+      <p style="margin-top: 0.25rem;">Piattaforma Beyblade X con Club Organizzatori, Round Robin & Locandine 4:5.</p>
+    </div>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/covers.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

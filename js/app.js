@@ -401,6 +401,8 @@ function showTournamentDetailView(eventId) {
 
   // Keep the exact event associated with the poster and its download button.
   window.currentDetailEvent = evt;
+  const posterDownloadButton = document.querySelector('.poster-download-btn-overlay');
+  if (posterDownloadButton) posterDownloadButton.dataset.eventId = evt.id;
 
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -1016,8 +1018,9 @@ function dataURItoBlob(dataURI) {
   return new Blob([ab], { type: mimeString });
 }
 
-function downloadPosterImage() {
-  const evt = window.currentDetailEvent;
+function downloadPosterImage(downloadButton) {
+  const eventId = downloadButton?.dataset?.eventId || new URLSearchParams(window.location.hash.split('?')[1] || '').get('id');
+  const evt = eventId ? window.storageManager.getEventById(eventId) : window.currentDetailEvent;
   const posterCanvas = document.getElementById('posterCanvas');
   if (!evt || !posterCanvas) {
     showToast('Apri prima la pagina del torneo da scaricare.', 'error');
@@ -1026,8 +1029,8 @@ function downloadPosterImage() {
 
   const fileName = `beyside_${(evt.title || 'torneo').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_4x5.png`;
   try {
-    // Export the same canvas visible in the page: no second rendering can
-    // accidentally fall back to the default BeySide Cup poster.
+    // Export the exact canvas visible in the page. The event id is kept on
+    // the button too, which is more reliable than a global variable on mobile browsers.
     triggerPosterDownload(posterCanvas.toDataURL('image/png'), fileName);
     showToast('Locandina scaricata con successo!', 'success');
   } catch (error) {
@@ -1166,7 +1169,7 @@ function renderAdminTable() {
             <td><span class="status-badge ${statusClass}">[${(evt.status || 'aperto').toUpperCase()}]</span></td>
             <td><strong>${registeredCount} / ${evt.maxTeams}</strong> Squadre</td>
             <td class="actions-cell">
-              <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; white-space: nowrap;">
+              <div class="admin-row-actions">
                 <button class="btn btn-secondary btn-sm" onclick="editEvent('${evt.id}')">Modifica</button>
                 <button class="btn btn-danger btn-sm" onclick="confirmDeleteEvent('${evt.id}')">Elimina</button>
               </div>

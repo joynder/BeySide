@@ -7,13 +7,16 @@ const STORAGE_KEYS = {
   EVENTS: 'beyside_events_v6',
   TEAMS: 'beyside_teams_v6',
   CLUBS: 'beyside_clubs_v6',
+  CLUB_REQUESTS: 'beyside_club_requests_v6',
   SESSION: 'beyside_session_v6',
+  ADMIN_SESSION: 'beyside_admin_session_v6',
   THEME: 'beyside_theme_v6'
 };
 
 const DEFAULT_CLUBS = [];
 const DEFAULT_TEAMS = [];
 const DEFAULT_EVENTS = [];
+const DEFAULT_CLUB_REQUESTS = [];
 
 // Questa è una chiave "publishable": è prevista per essere inclusa nel sito.
 // La sicurezza effettiva è definita dalle policy SQL in supabase-setup.sql.
@@ -27,7 +30,9 @@ class StorageManager {
     this.events = [];
     this.teams = [];
     this.clubs = [];
+    this.clubRequests = [];
     this.currentTeamId = null;
+    this.adminSession = null;
     this.remoteEnabled = false;
     this.remoteSyncPending = false;
     this.remoteSyncInFlight = false;
@@ -67,8 +72,27 @@ class StorageManager {
         this.saveLocal(STORAGE_KEYS.CLUBS, this.clubs);
       }
 
+      const localClubRequests = localStorage.getItem(STORAGE_KEYS.CLUB_REQUESTS);
+      if (localClubRequests) {
+        this.clubRequests = JSON.parse(localClubRequests);
+        // Clean up test requests
+        this.clubRequests = (this.clubRequests || []).filter(r => (r.clubName || '').trim().toLowerCase() !== 'prova');
+      } else {
+        this.clubRequests = JSON.parse(JSON.stringify(DEFAULT_CLUB_REQUESTS));
+      }
+      this.saveLocal(STORAGE_KEYS.CLUB_REQUESTS, this.clubRequests);
+
       if (localSession) {
         this.currentTeamId = localSession;
+      }
+
+      const localAdminSession = localStorage.getItem(STORAGE_KEYS.ADMIN_SESSION);
+      if (localAdminSession) {
+        try {
+          this.adminSession = JSON.parse(localAdminSession);
+        } catch (e) {
+          this.adminSession = null;
+        }
       }
 
       // Migrate any old .svg cover references to .png
@@ -86,6 +110,7 @@ class StorageManager {
       this.events = JSON.parse(JSON.stringify(DEFAULT_EVENTS));
       this.teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
       this.clubs = JSON.parse(JSON.stringify(DEFAULT_CLUBS));
+      this.clubRequests = JSON.parse(JSON.stringify(DEFAULT_CLUB_REQUESTS));
     }
   }
 
@@ -104,6 +129,11 @@ class StorageManager {
     this.queueRemoteSync();
   }
 
+  saveClubRequests() {
+    this.saveLocal(STORAGE_KEYS.CLUB_REQUESTS, this.clubRequests);
+    this.queueRemoteSync();
+  }
+
   saveLocal(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -116,12 +146,13 @@ class StorageManager {
     return {
       events: this.events || [],
       teams: this.teams || [],
-      clubs: this.clubs || []
+      clubs: this.clubs || [],
+      clubRequests: this.clubRequests || []
     };
   }
 
   hasSharedData(state) {
-    return state.events.length > 0 || state.teams.length > 0 || state.clubs.length > 0;
+    return state.events.length > 0 || state.teams.length > 0 || state.clubs.length > 0 || (state.clubRequests || []).length > 0;
   }
 
   applySharedState(state) {
@@ -131,9 +162,11 @@ class StorageManager {
     this.events = state.events;
     this.teams = state.teams;
     this.clubs = state.clubs;
+    this.clubRequests = state.clubRequests || [];
     this.saveLocal(STORAGE_KEYS.EVENTS, this.events);
     this.saveLocal(STORAGE_KEYS.TEAMS, this.teams);
     this.saveLocal(STORAGE_KEYS.CLUBS, this.clubs);
+    this.saveLocal(STORAGE_KEYS.CLUB_REQUESTS, this.clubRequests);
   }
 
   cloneState(state) {
@@ -173,7 +206,8 @@ class StorageManager {
     return {
       events: this.mergeCollection(baseState.events, localState.events, remoteState.events),
       teams: this.mergeCollection(baseState.teams, localState.teams, remoteState.teams),
-      clubs: this.mergeCollection(baseState.clubs, localState.clubs, remoteState.clubs)
+      clubs: this.mergeCollection(baseState.clubs, localState.clubs, remoteState.clubs),
+      clubRequests: this.mergeCollection(baseState.clubRequests || [], localState.clubRequests || [], remoteState.clubRequests || [])
     };
   }
 
@@ -344,11 +378,14 @@ class StorageManager {
     return this.clubs || [];
   }
 
-  addClub({ name, city, logoUrl }) {
+  addClub({ name, city, leaderNickname, email, accessKey, logoUrl }) {
     const newClub = {
       id: 'club-' + Date.now(),
       name,
       city: city || '',
+      leaderNickname: leaderNickname || '',
+      email: email || '',
+      accessKey: accessKey || '',
       logoUrl: logoUrl || name.substring(0, 1).toUpperCase()
     };
     this.clubs.unshift(newClub);
@@ -359,6 +396,162 @@ class StorageManager {
   deleteClub(id) {
     this.clubs = (this.clubs || []).filter(c => c.id !== id);
     this.saveClubs();
+  }
+
+  getClubById(id) {
+    return (this.clubs || []).find(c => c.id === id);
+  }
+
+  getClubByName(name) {
+    return (this.clubs || []).find(c => c.name && c.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+  }
+
+  updateClubLeaderDetails(clubId, { leaderNickname, city }) {
+    const club = this.getClubById(clubId);
+    if (club) {
+      if (leaderNickname !== undefined) club.leaderNickname = leaderNickname;
+      if (city !== undefined) club.city = city;
+      this.saveClubs();
+      if (this.adminSession && this.adminSession.clubId === clubId) {
+        if (leaderNickname !== undefined) this.adminSession.leaderNickname = leaderNickname;
+        if (city !== undefined) this.adminSession.city = city;
+        this.saveLocal(STORAGE_KEYS.ADMIN_SESSION, this.adminSession);
+      }
+      return { success: true, club };
+    }
+    return { success: false, message: 'Club non trovato.' };
+  }
+
+  updateClubLeaderNickname(clubId, newNickname) {
+    return this.updateClubLeaderDetails(clubId, { leaderNickname: newNickname });
+  }
+
+  /* CLUB REQUESTS MANAGEMENT */
+  getClubRequests() {
+    return this.clubRequests || [];
+  }
+
+  addClubRequest({ clubName, city, leaderNickname, email, notes }) {
+    const newRequest = {
+      id: 'req-' + Date.now(),
+      clubName,
+      city: city || '',
+      leaderNickname: leaderNickname || '',
+      email: email || '',
+      notes: notes || '',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    if (!this.clubRequests) this.clubRequests = [];
+    this.clubRequests.unshift(newRequest);
+    this.saveClubRequests();
+    return newRequest;
+  }
+
+  approveClubRequest(reqId) {
+    const req = (this.clubRequests || []).find(r => r.id === reqId);
+    if (!req) return { success: false, message: 'Richiesta non trovata.' };
+
+    let existingClub = this.getClubByName(req.clubName);
+    let accessKey = req.generatedKey || (existingClub ? existingClub.accessKey : '');
+
+    if (!accessKey) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      for (let i = 0; i < 8; i++) {
+        accessKey += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    }
+
+    let targetClub = existingClub;
+    if (!targetClub) {
+      targetClub = {
+        id: 'club-' + Date.now(),
+        name: req.clubName,
+        city: req.city || '',
+        leaderNickname: req.leaderNickname || '',
+        email: req.email || '',
+        accessKey: accessKey,
+        logoUrl: req.clubName.substring(0, 1).toUpperCase()
+      };
+      this.clubs.unshift(targetClub);
+      this.saveClubs();
+    } else {
+      if (!targetClub.accessKey) {
+        targetClub.accessKey = accessKey;
+        this.saveClubs();
+      }
+      if (!targetClub.leaderNickname && req.leaderNickname) {
+        targetClub.leaderNickname = req.leaderNickname;
+        this.saveClubs();
+      }
+      if (!targetClub.city && req.city) {
+        targetClub.city = req.city;
+        this.saveClubs();
+      }
+      if (!targetClub.email && req.email) {
+        targetClub.email = req.email;
+        this.saveClubs();
+      }
+    }
+
+    req.status = 'approved';
+    req.generatedKey = accessKey;
+    req.approvedAt = req.approvedAt || new Date().toISOString();
+    this.saveClubRequests();
+
+    return {
+      success: true,
+      club: targetClub,
+      leaderNickname: req.leaderNickname || targetClub.leaderNickname,
+      email: req.email || targetClub.email,
+      accessKey: accessKey
+    };
+  }
+
+  rejectClubRequest(reqId) {
+    this.clubRequests = (this.clubRequests || []).filter(r => r.id !== reqId && (r.clubName || '').trim().toLowerCase() !== 'prova');
+    this.saveClubRequests();
+    return { success: true };
+  }
+
+  deleteClubRequest(reqId) {
+    return this.rejectClubRequest(reqId);
+  }
+
+  /* ADMIN / CLUB LEADER AUTHENTICATION */
+  loginAdminOrClub(username, password) {
+    const cleanUser = (username || '').trim();
+    const cleanPass = (password || '').trim();
+
+    if (cleanUser.toLowerCase() === 'admin' && cleanPass.toLowerCase() === 'beyside') {
+      this.adminSession = { role: 'admin' };
+      this.saveLocal(STORAGE_KEYS.ADMIN_SESSION, this.adminSession);
+      return { success: true, role: 'admin' };
+    }
+
+    const club = this.getClubByName(cleanUser);
+    if (club && club.accessKey && club.accessKey.trim().toUpperCase() === cleanPass.toUpperCase()) {
+      this.adminSession = {
+        role: 'club_leader',
+        clubId: club.id,
+        clubName: club.name,
+        leaderNickname: club.leaderNickname || '',
+        city: club.city || ''
+      };
+      this.saveLocal(STORAGE_KEYS.ADMIN_SESSION, this.adminSession);
+      return { success: true, role: 'club_leader', club: club };
+    }
+
+    return { success: false, message: 'Username o password non validi.' };
+  }
+
+  getCurrentAdminSession() {
+    return this.adminSession || null;
+  }
+
+  logoutAdminSession() {
+    this.adminSession = null;
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
   }
 
   /* TEAM ACCOUNT & AUTHENTICATION */
@@ -760,14 +953,19 @@ class StorageManager {
     localStorage.removeItem(STORAGE_KEYS.EVENTS);
     localStorage.removeItem(STORAGE_KEYS.TEAMS);
     localStorage.removeItem(STORAGE_KEYS.CLUBS);
+    localStorage.removeItem(STORAGE_KEYS.CLUB_REQUESTS);
     localStorage.removeItem(STORAGE_KEYS.SESSION);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
     this.events = JSON.parse(JSON.stringify(DEFAULT_EVENTS));
     this.teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
     this.clubs = JSON.parse(JSON.stringify(DEFAULT_CLUBS));
+    this.clubRequests = JSON.parse(JSON.stringify(DEFAULT_CLUB_REQUESTS));
     this.currentTeamId = null;
+    this.adminSession = null;
     this.saveEvents();
     this.saveTeams();
     this.saveClubs();
+    this.saveClubRequests();
   }
 }
 

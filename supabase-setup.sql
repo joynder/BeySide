@@ -1,7 +1,7 @@
 -- Esegui questo script una sola volta nel SQL Editor di Supabase.
 create table if not exists public.beyside_state (
   id text primary key check (id = 'global'),
-  state jsonb not null default '{"events": [], "teams": [], "clubs": []}'::jsonb,
+  state jsonb not null default '{"events": [], "teams": [], "clubs": [], "clubRequests": []}'::jsonb,
   version integer not null default 1,
   updated_at timestamptz not null default now()
 );

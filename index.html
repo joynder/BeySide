@@ -62,16 +62,11 @@
           <h2>Tornei & Eventi Ufficiali</h2>
           <p>Seleziona un torneo per aprire la pagina dedicata con locandina 4:5, tabellone Round Robin ed iscrizioni.</p>
         </div>
-        <div>
-          <button class="btn btn-primary" onclick="openCreateEventModal()">
-            + Nuovo Torneo
-          </button>
-        </div>
       </div>
 
       <div class="filter-bar">
         <div class="search-input-wrap">
-          <input type="text" id="eventSearchInput" placeholder="Cerca torneo per nome, club organizzatore, luogo o città...">
+          <input type="text" id="eventSearchInput" placeholder="Cerca torneo...">
         </div>
         <div>
           <select id="eventStatusFilter" class="filter-select">
@@ -104,7 +99,7 @@
 
       <div class="filter-bar">
         <div class="search-input-wrap">
-          <input type="text" id="standingsSearchInput" placeholder="Cerca squadra nella classifica per nome, tag, capitano o città...">
+          <input type="text" id="standingsSearchInput" placeholder="Cerca squadra...">
         </div>
       </div>
 
@@ -138,7 +133,7 @@
           <form id="teamLoginForm">
             <div class="form-group">
               <label class="form-label">Email Capitano</label>
-              <input type="email" id="loginEmailInput" class="form-control" placeholder="marco.rossi@email.it" required>
+              <input type="email" id="loginEmailInput" class="form-control" placeholder="email@esempio.it" required>
             </div>
             <div class="form-group">
               <label class="form-label">Password</label>
@@ -158,39 +153,39 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Email Capitano <span class="required">*</span></label>
-                <input type="email" id="regEmailInput" class="form-control" placeholder="capitano@email.it" required>
+                <input type="email" id="regEmailInput" class="form-control" placeholder="email@esempio.it" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Password <span class="required">*</span></label>
-                <input type="password" id="regPasswordInput" class="form-control" placeholder="Crea Password" required>
+                <input type="password" id="regPasswordInput" class="form-control" placeholder="Password" required>
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Nome Squadra <span class="required">*</span></label>
-                <input type="text" id="regTeamNameInput" class="form-control" placeholder="Es. Dragoon Knights" required>
+                <input type="text" id="regTeamNameInput" class="form-control" placeholder="Nome Squadra" required>
               </div>
               <div class="form-group">
                 <label class="form-label">TAG (3 lettere)</label>
-                <input type="text" id="regTagInput" class="form-control" placeholder="Es. DGK" maxlength="3" minlength="3">
+                <input type="text" id="regTagInput" class="form-control" placeholder="TAG" maxlength="3" minlength="3">
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Nome Capitano <span class="required">*</span></label>
-                <input type="text" id="regCaptainInput" class="form-control" placeholder="Es. Marco Rossi" required>
+                <input type="text" id="regCaptainInput" class="form-control" placeholder="Nome Capitano" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Città</label>
-                <input type="text" id="regCityInput" class="form-control" placeholder="Es. Milano">
+                <input type="text" id="regCityInput" class="form-control" placeholder="Città">
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Icona / Avatar Team (URL Immagine o Lettera)</label>
-              <input type="text" id="regIconInput" class="form-control" placeholder="Es. https://... oppure X">
+              <label class="form-label">Icona / Avatar Team (URL o Iniziale)</label>
+              <input type="text" id="regIconInput" class="form-control" placeholder="URL o iniziale">
             </div>
 
             <button type="submit" class="btn btn-primary" style="width:100%;">Registra Squadra & Crea Account</button>
@@ -227,12 +222,17 @@
           <!-- Profile & Roster Management -->
           <form id="updateRosterForm">
             <div class="form-group">
-              <label class="form-label">Icona / Logo Squadra (URL Immagine o Iniziale)</label>
-              <input type="text" id="dashIconInput" class="form-control" placeholder="Es. https://... oppure X">
+              <label class="form-label">Icona / Logo Squadra (URL o Iniziale)</label>
+              <input type="text" id="dashIconInput" class="form-control" placeholder="URL o iniziale">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Città di Provenienza</label>
+              <input type="text" id="dashCityInput" class="form-control" placeholder="Città del Team">
             </div>
 
             <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
-              Gestione Roster Giocatori (Da 3 a 5 Giocatori)
+              Gestione Roster Giocatori (Da 3 a 4 Giocatori)
             </h3>
 
             <div id="dashRosterEditor">
@@ -253,17 +253,79 @@
     <!-- TAB 4: ADMIN                                                      -->
     <!-- ----------------------------------------------------------------- -->
     <div class="tab-pane" id="gestionaleTab">
-      <!-- Admin Login Form (Password Gate) -->
+      <!-- Admin & Club Leader Login Form -->
       <div id="adminAuthContainer" style="max-width: 440px; margin: 2rem auto;">
         <div class="auth-card">
-          <h3 class="auth-card-title">Accesso Area Riservata Admin</h3>
+          <h3 class="auth-card-title">Accesso Area Riservata</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.2rem;">
+            Inserisci le credenziali di Amministrazione o quelle del tuo Club.
+          </p>
           <form id="adminLoginForm" onsubmit="submitAdminLogin(event)">
             <div class="form-group">
-              <label class="form-label">Password Amministratore <span class="required">*</span></label>
-              <input type="password" id="adminPasswordInput" class="form-control" placeholder="Inserisci Password Admin" required>
+              <label class="form-label">Username (Admin o Nome Club) <span class="required">*</span></label>
+              <input type="text" id="adminUsernameInput" class="form-control" placeholder="Admin o Nome Club" required>
             </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;">Accedi come Admin</button>
+            <div class="form-group">
+              <label class="form-label">Password / Access Key <span class="required">*</span></label>
+              <input type="password" id="adminPasswordInput" class="form-control" placeholder="Password o Access Key" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Accedi al Pannello</button>
           </form>
+          <div style="margin-top: 1.25rem; font-size: 0.85rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            Per richiedere il tuo club <a href="javascript:void(0)" onclick="openClubRequestModal()" style="font-weight: 700; color: var(--text-main); text-decoration: underline;">Invia un modulo di richiesta</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Authenticated Club Leader Dashboard -->
+      <div id="clubLeaderPanelContainer" style="display:none;" class="admin-container">
+        <div class="admin-banner">
+          <div>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.25rem;">
+              <h2 id="clubLeaderClubName" style="font-size: 1.3rem; text-transform: uppercase;"></h2>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+              Leader: <strong id="clubLeaderNick" style="color:var(--text-main);"></strong> | Sede: <span id="clubLeaderCity"></span>
+            </p>
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.5rem; flex-wrap:wrap;">
+              <input type="text" id="clubLeaderNickEditInput" class="form-control" style="max-width:160px; padding:0.3rem 0.6rem; font-size:0.85rem;" placeholder="Nickname Leader">
+              <input type="text" id="clubLeaderCityEditInput" class="form-control" style="max-width:160px; padding:0.3rem 0.6rem; font-size:0.85rem;" placeholder="Sede / Città">
+              <button class="btn btn-secondary btn-sm" onclick="updateClubLeaderDetailsAction()">Aggiorna Leader</button>
+            </div>
+          </div>
+          <div class="admin-actions-group">
+            <button class="btn btn-primary" onclick="openCreateEventModal()">
+              + Nuovo Torneo
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="copyCurrentClubKey()">
+              Copia Chiave Accesso
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="logoutAdmin()">
+              Logout Club
+            </button>
+          </div>
+        </div>
+
+        <!-- Club Leader Tournaments Table -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; margin-bottom:0.75rem;">
+          <h3 style="font-size: 1.1rem; text-transform: uppercase;">Tornei Organizzati dal Tuo Club</h3>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Nome Torneo</th>
+                <th>Data & Ora</th>
+                <th>Luogo / Venue</th>
+                <th>Stato</th>
+                <th>Squadre Iscritte</th>
+                <th>Gestione</th>
+              </tr>
+            </thead>
+            <tbody id="clubLeaderEventsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -272,24 +334,18 @@
         <div class="admin-banner">
           <div>
             <h2 style="font-size: 1.25rem; text-transform: uppercase;">
-              Pannello Amministrazione ADMIN
+              Pannello Amministrazione Globale ADMIN
             </h2>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
-              Gestisci i tornei, registra nuovi Club organizzatori ed esporta i file JSON.
+              Gestisci richieste, tornei, club organizzatori ed esporta i dati.
             </p>
           </div>
           <div class="admin-actions-group">
-            <button class="btn btn-primary" onclick="openCreateClubModal()">
-              + Nuovo Club
-            </button>
             <button class="btn btn-secondary btn-sm" onclick="exportData('events')">
               Esporta events.json
             </button>
             <button class="btn btn-secondary btn-sm" onclick="exportData('teams')">
               Esporta teams.json
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="resetData()">
-              Ripristina Dati
             </button>
             <button class="btn btn-danger btn-sm" onclick="logoutAdmin()">
               Logout Admin
@@ -297,14 +353,43 @@
           </div>
         </div>
 
+        <!-- Approval Email Direct Action Banner -->
+        <div id="adminApprovalNoticeBox" style="display:none; margin-top:1.5rem;"></div>
+
+        <!-- Pending Club Requests Table -->
+        <div id="adminClubRequestsContainer" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 1.5rem; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1.1rem; text-transform: uppercase;">Richieste Club in Attesa</h3>
+            <span id="pendingRequestsBadge" class="status-badge" style="display:none;"></span>
+          </div>
+          <div class="admin-table-wrap" style="overflow-x:auto;">
+            <table class="requests-table">
+              <thead>
+                <tr>
+                  <th>Club</th>
+                  <th>Leader</th>
+                  <th>Email</th>
+                  <th style="width:70px; text-align:center;">Note</th>
+                  <th style="width:130px; text-align:right;">Azione</th>
+                </tr>
+              </thead>
+              <tbody id="adminClubRequestsTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Clubs Management Table -->
-        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 1rem;">Club Organizzatori Iscritti</h3>
+        <h3 style="font-size: 1.1rem; text-transform: uppercase; margin-top: 2rem;">Club Organizzatori Iscritti</h3>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
               <tr>
                 <th>Nome Club</th>
                 <th>Città</th>
+                <th>Nickname Leader</th>
+                <th>Access Key (Password)</th>
                 <th>Azione Admin</th>
               </tr>
             </thead>
@@ -424,14 +509,18 @@
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">Titolo Torneo / Evento <span class="required">*</span> <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(max 35 caratteri)</span></label>
-            <input type="text" id="eventTitleInput" class="form-control" placeholder="Es. BeySide Cup Milano" maxlength="35" required>
+            <input type="text" id="eventTitleInput" class="form-control" placeholder="Nome torneo" maxlength="35" required>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" id="eventClubSelectGroup">
             <label class="form-label">Club Organizzatore <span class="required">*</span></label>
-            <select id="eventClubSelect" class="form-control" required>
+            <select id="eventClubSelect" class="form-control">
               <!-- Options populated dynamically -->
             </select>
+          </div>
+          <div class="form-group" id="eventClubFixedGroup" style="display:none;">
+            <label class="form-label">Club Organizzatore</label>
+            <div id="eventClubFixedDisplay" style="padding:0.65rem 1rem; background-color:var(--bg-input); border-radius:var(--radius-md); font-weight:800; border:1px solid var(--border-color);"></div>
           </div>
 
           <div class="form-row">
@@ -448,18 +537,18 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Nome Venue / Location <span class="required">*</span></label>
-              <input type="text" id="eventVenueInput" class="form-control" placeholder="Es. Esports Arena Milano" required>
+              <input type="text" id="eventVenueInput" class="form-control" placeholder="Nome venue" required>
             </div>
             <div class="form-group">
               <label class="form-label">Indirizzo & Città</label>
-              <input type="text" id="eventLocationInput" class="form-control" placeholder="Es. Via E. Fermi 12, Milano (MI)">
+              <input type="text" id="eventLocationInput" class="form-control" placeholder="Indirizzo, città">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Quota Iscrizione (€)</label>
-              <input type="text" id="eventFeeInput" class="form-control" placeholder="Es. 15" value="15">
+              <input type="text" id="eventFeeInput" class="form-control" placeholder="15" value="15">
             </div>
             <div class="form-group">
               <label class="form-label">Max Squadre Ammesse</label>
@@ -476,7 +565,7 @@
 
           <div class="form-group">
             <label class="form-label">Descrizione / Regolamento</label>
-            <textarea id="eventDescriptionInput" class="form-control" rows="3" placeholder="Informazioni sul torneo e regolamento..."></textarea>
+            <textarea id="eventDescriptionInput" class="form-control" rows="3" placeholder="Regolamento e info..."></textarea>
           </div>
         </div>
 
@@ -502,19 +591,118 @@
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">Nome Club Organizzatore <span class="required">*</span></label>
-            <input type="text" id="clubNameInput" class="form-control" placeholder="Es. Milano BeyBlade Club" required>
+            <input type="text" id="clubNameInput" class="form-control" placeholder="Nome club" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Città / Sede</label>
-            <input type="text" id="clubCityInput" class="form-control" placeholder="Es. Milano">
+            <label class="form-label">Città / Sede <span class="required">*</span></label>
+            <input type="text" id="clubCityInput" class="form-control" placeholder="Città" required>
           </div>
+          <div class="form-group">
+            <label class="form-label">Nickname Club Leader <span class="required">*</span></label>
+            <input type="text" id="clubLeaderNickInput" class="form-control" placeholder="Nickname leader" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Club Leader (per invio credenziali)</label>
+            <input type="email" id="clubEmailInput" class="form-control" placeholder="email@esempio.it">
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">
+            * Alla creazione del club verrà generata automaticamente una Access Key alfanumerica per l'accesso del Club Leader.
+          </p>
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('clubModal')">Annulla</button>
-          <button type="submit" class="btn btn-primary">Salva Club</button>
+          <button type="submit" class="btn btn-primary">Crea Club & Genera Key</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: RICHIESTA NUOVO CLUB (PUBBLICO)                             -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="clubRequestModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Modulo di Richiesta Club Ufficiale</h3>
+        <button class="modal-close-btn" onclick="closeModal('clubRequestModal')">X</button>
+      </div>
+
+      <form id="clubRequestForm">
+        <div class="modal-body">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+            Compila le informazioni necessarie per richiedere l'apertura del tuo Club su BeySide. L'Admin valuterà la richiesta e ti invierà la Access Key per email.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Nome Club Proposto <span class="required">*</span></label>
+            <input type="text" id="reqClubNameInput" class="form-control" placeholder="Nome club" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Città / Sede <span class="required">*</span></label>
+              <input type="text" id="reqCityInput" class="form-control" placeholder="Città" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nickname Club Leader <span class="required">*</span></label>
+              <input type="text" id="reqLeaderNickInput" class="form-control" placeholder="Nickname leader" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email di Contatto Leader <span class="required">*</span></label>
+            <input type="email" id="reqEmailInput" class="form-control" placeholder="email@esempio.it" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Note / Informazioni Aggiuntive</label>
+            <textarea id="reqNotesInput" class="form-control" rows="3" placeholder="Note o dettagli del club..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('clubRequestModal')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Invia Richiesta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: DETTAGLIO CREDENZIALI & INVIO EMAIL CLUB APPROVATO           -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="clubApprovedModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="clubApprovedModalTitle">Club Approvato & Credenziali Generate</h3>
+        <button class="modal-close-btn" onclick="closeModal('clubApprovedModal')">X</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background-color:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1rem; margin-bottom:1rem;">
+          <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:800;">Club Organizzatore</div>
+          <div style="font-size:1.15rem; font-weight:900;" id="approvedClubNameDisplay"></div>
+          <div style="font-size:0.85rem; margin-top:0.25rem;">
+            Leader: <strong id="approvedLeaderDisplay" style="color:var(--text-main);"></strong> | Email: <span id="approvedEmailDisplay"></span>
+          </div>
+        </div>
+
+        <div style="background-color:var(--bg-card); border:2px dashed var(--accent-blue); border-radius:var(--radius-md); padding:1rem; text-align:center; margin-bottom:1.25rem;">
+          <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Access Key (Password per il Login)</div>
+          <div id="approvedKeyDisplay" style="font-size:1.6rem; font-weight:900; letter-spacing:0.12em; color:var(--accent-blue); margin:0.35rem 0;"></div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyApprovedKey()">Copia Chiave</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Anteprima Messaggio Email per il Club Leader</label>
+          <textarea id="approvedEmailBodyPreview" class="form-control" rows="5" readonly style="font-family:monospace; font-size:0.8rem;"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('clubApprovedModal')">Chiudi</button>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" onclick="copyApprovedEmailText()">Copia Messaggio</button>
+          <a id="approvedSendEmailBtn" href="#" class="btn btn-primary" target="_blank">Invia per Email</a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -559,8 +747,8 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/storage.js?v=20260910"></script>
+  <script src="js/storage.js?v=20260910-club-leaders"></script>
   <script src="js/covers.js?v=20260910"></script>
-  <script src="js/app.js?v=20260910-mobile-layout-ranking"></script>
+  <script src="js/app.js?v=20260910-club-leaders"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    BEYSIDE - Beyblade X Tournament Manager
    High Contrast Monochrome Styling (Minimal Blue, Red Destructive Buttons)
    ========================================================================== */
@@ -850,6 +850,46 @@ button {
   overflow-x: auto;
 }
 
+/* Compact table for club requests - fits in page without horizontal scroll */
+.requests-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.requests-table th, .requests-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.requests-table th {
+  background-color: var(--bg-input);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+/* Email column: show full address without ellipsis */
+.requests-table td:nth-child(4) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+/* Note and Action columns: fixed narrow width */
+.requests-table td:nth-child(5) {
+  text-align: center;
+  overflow: visible;
+}
+.requests-table td:last-child {
+  text-align: right;
+  overflow: visible;
+  white-space: nowrap;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -873,6 +913,24 @@ button {
   text-overflow: clip !important;
   white-space: nowrap !important;
   text-align: right;
+}
+
+/* Email cell: sempre visibile per intero */
+.admin-table td[data-label="Email"] {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+/* Note cell: compatta, contenuto via popup */
+.admin-table td[data-label="Note"] {
+  overflow: visible;
+  text-overflow: clip;
+  text-align: center;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
 }
 
 .admin-table th {

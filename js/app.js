@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTeamForms();
   initEventForm();
   initClubForm();
+  initClubRequestForm();
 
   handleHashRouting();
   window.addEventListener('hashchange', handleHashRouting);
@@ -32,6 +33,20 @@ function refreshSharedDataView() {
   // Do not replace text while someone is filling in a form.
   const activeElement = document.activeElement;
   if (activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName)) return;
+
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#torneo-detail')) {
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    const eventId = params.get('id');
+    if (eventId) {
+      const evt = window.storageManager.getEventById(eventId);
+      if (evt) {
+        renderSwissMatchesOnDetailPage(evt);
+        return;
+      }
+    }
+  }
+
   handleHashRouting();
 }
 
@@ -223,29 +238,32 @@ function renderCaptainDashboard(team) {
   const iconInput = document.getElementById('dashIconInput');
   if (iconInput) iconInput.value = team.iconUrl || '';
 
+  const cityInput = document.getElementById('dashCityInput');
+  if (cityInput) cityInput.value = team.city || '';
+
   const rosterContainer = document.getElementById('dashRosterEditor');
   if (!rosterContainer) return;
 
   const players = team.players || [];
   let html = '';
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 4; i++) {
     const p = players[i] || { name: '', nickname: '' };
     const isRequired = i < 3;
 
     html += `
       <div class="player-row-card">
         <div class="player-row-header">
-          <span>GIOCATORE #${i+1} ${isRequired ? '(OBBLIGATORIO)' : '(OPZIONALE)'}</span>
+          <span>GIOCATORE #${i+1} ${isRequired ? '(OBBLIGATORIO)' : '(OPZIONALE)'} ${i === 0 ? '- [CAPITANO]' : ''}</span>
         </div>
         <div class="form-row">
           <div class="form-group" style="margin-bottom:0.4rem;">
             <label class="form-label">Nickname / Gamertag ${isRequired ? '*' : ''}</label>
-            <input type="text" class="form-control dash-player-nick" value="${escapeHtml(p.nickname || p.name)}" placeholder="Es. Dragger" ${isRequired ? 'required' : ''}>
+            <input type="text" class="form-control dash-player-nick" value="${escapeHtml(p.nickname || p.name)}" placeholder="Nickname" ${isRequired ? 'required' : ''}>
           </div>
           <div class="form-group" style="margin-bottom:0.4rem;">
             <label class="form-label">Nome & Cognome</label>
-            <input type="text" class="form-control dash-player-name" value="${escapeHtml(p.name)}" placeholder="Es. Marco Rossi">
+            <input type="text" class="form-control dash-player-name" value="${escapeHtml(p.name)}" placeholder="Nome e Cognome">
           </div>
         </div>
       </div>
@@ -260,6 +278,7 @@ function saveCaptainDashboardRoster() {
   if (!currentTeam) return;
 
   const iconUrl = document.getElementById('dashIconInput')?.value.trim();
+  const city = document.getElementById('dashCityInput')?.value.trim();
   const names = document.querySelectorAll('.dash-player-name');
   const nicks = document.querySelectorAll('.dash-player-nick');
 
@@ -280,8 +299,16 @@ function saveCaptainDashboardRoster() {
     return;
   }
 
-  window.storageManager.updateTeamProfile(currentTeam.id, { players, iconUrl });
-  showToast('Profilo ed Icona aggiornati con successo.', 'success');
+  // Cap at 4 players max
+  if (players.length > 4) {
+    players.length = 4;
+  }
+
+  // Player #1 is always the captain
+  const captain = players[0]?.name || players[0]?.nickname || currentTeam.captain;
+
+  window.storageManager.updateTeamProfile(currentTeam.id, { players, iconUrl, city, captain });
+  showToast('Profilo, Roster ed Icona aggiornati con successo.', 'success');
   renderTeamAccountArea();
   renderClassifica();
 }
@@ -390,9 +417,10 @@ function renderEvents() {
 
 function openTournamentDetailPage(eventId) {
   window.location.hash = `#torneo-detail?id=${eventId}`;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showTournamentDetailView(eventId) {
+function showTournamentDetailView(eventId, shouldScroll = false) {
   const evt = window.storageManager.getEventById(eventId);
   if (!evt) {
     navigateToTab('eventi');
@@ -443,7 +471,7 @@ function showTournamentDetailView(eventId) {
       if (!loggedTeam) {
         enrollBtn.disabled = false;
         enrollBtn.style.opacity = '1';
-        enrollBtn.textContent = 'Accedi con la tua Squadra in Area Team per Iscriverti';
+        enrollBtn.textContent = 'Accedi come squadra per iscriverti';
         enrollBtn.onclick = () => navigateToTab('area-team');
       } else if (evt.status !== 'aperto' || isFull) {
         enrollBtn.disabled = true;
@@ -475,7 +503,7 @@ function showTournamentDetailView(eventId) {
             <span style="font-size:0.75rem; font-weight:700;">Capitano: ${escapeHtml(team.captain)}</span>
           </div>
           <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.35rem;">
-            ROSTER GIOCATORI (${team.players.length}/5):
+            ROSTER GIOCATORI (${team.players.length}/4):
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
             ${(team.players || []).map(p => `
@@ -495,7 +523,9 @@ function showTournamentDetailView(eventId) {
   // Render Live Round Robin Matches
   renderSwissMatchesOnDetailPage(evt);
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (shouldScroll) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 function quickEnrollTeam(eventId, teamId) {
@@ -532,16 +562,22 @@ function renderSwissMatchesOnDetailPage(evt) {
   const currentRoundNum = rounds.length;
   const isLastRoundReached = currentRoundNum >= totalMaxRounds && totalMaxRounds > 0;
 
+  const session = window.storageManager.getCurrentAdminSession();
+  const canManage = session && (
+    session.role === 'admin' ||
+    (session.role === 'club_leader' && session.clubName && session.clubName.trim().toLowerCase() === (evt.organizingClub || '').trim().toLowerCase())
+  );
+
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
       <h3 style="font-size: 1.1rem; text-transform: uppercase;">
         Tabellone Round Robin (${totalMaxRounds > 0 ? `Turni totali previsti: ${totalMaxRounds}` : ''})
       </h3>
-      ${!isConcluded ? `
+      ${!isConcluded && canManage ? `
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
           ${rounds.length === 0 ? `
             <button class="btn btn-primary btn-sm" onclick="startSwissOnDetailPage('${evt.id}', event)">
-              Avvia Torneo Round Robin
+              Avvia Torneo
             </button>
           ` : `
             ${!isLastRoundReached ? `
@@ -554,14 +590,14 @@ function renderSwissMatchesOnDetailPage(evt) {
             </button>
           `}
         </div>
-      ` : `<span class="status-badge concluso">[TORNEO CONCLUSO]</span>`}
+      ` : (isConcluded ? `<span class="status-badge concluso">[TORNEO CONCLUSO]</span>` : '')}
     </div>
   `;
 
   if (rounds.length === 0 && !isConcluded) {
     html += `
       <div class="empty-state">
-        <p>Il torneo non è ancora stato avviato. Clicca su "Avvia Torneo Round Robin" per generare le sfide.</p>
+        <p>Il torneo non è ancora stato avviato.${canManage ? ' Clicca su "Avvia Torneo" per generare le sfide.' : ' In attesa che il Club Organizzatore avvii le sfide.'}</p>
       </div>
     `;
   } else {
@@ -584,7 +620,7 @@ function renderSwissMatchesOnDetailPage(evt) {
               <div class="swiss-match-item">
                 <span class="swiss-teams-vs">${team1Label} VS ${team2Label}</span>
                 <div>
-                  ${m.team2Id === 'BYE' ? `<strong>Vittoria Automatica (BYE)</strong>` : (isConcluded ? `
+                  ${m.team2Id === 'BYE' ? `<strong>Vittoria Automatica (BYE)</strong>` : (isConcluded || !canManage ? `
                     <strong>Vincitore: ${winnerDisplay}</strong>
                   ` : `
                     <button class="btn btn-sm ${m.winnerId === m.team1Id ? 'btn-primary' : 'btn-secondary'}" onclick="setSwissWinnerOnDetailPage('${evt.id}', ${r.roundNumber}, ${idx}, '${m.team1Id}', event)">
@@ -968,7 +1004,7 @@ function drawIMLStylePosterOnContext(ctx, evt, allowExternalImg = true) {
 
   ctx.fillText(`Ore ${evt.time || '10:00'}`, 50, 750);
   ctx.fillText(`€ ${evt.fee || '15'} Quota Iscrizione`, 50, 800);
-  ctx.fillText(`${evt.maxTeams || 16} Squadre (3-5 Giocatori)`, 50, 850);
+  ctx.fillText(`${evt.maxTeams || 16} Squadre (3-4 Giocatori)`, 50, 850);
   ctx.fillText(`${(evt.location || 'Via E. Fermi 12').substring(0, 45)}`, 50, 900);
 
   // Bottom-Right Brand Card with Fluo Lime Accent Bar
@@ -1135,7 +1171,7 @@ function renderClassifica() {
     <tr id="roster-row-${team.id}" style="display: none; background-color: var(--bg-input);">
       <td colspan="5" style="padding: 1rem;">
         <div style="font-size:0.8rem; font-weight:800; text-transform:uppercase; margin-bottom:0.4rem;">
-          Roster Giocatori (${(team.players || []).length}/5):
+          Roster Giocatori (${(team.players || []).length}/4):
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           ${(team.players || []).map(p => `
@@ -1236,7 +1272,7 @@ function renderAdminTable() {
     if (clubs.length === 0) {
       clubsTableBody.innerHTML = `
         <tr>
-          <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+          <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
             Nessun club organizzatore registrato.
           </td>
         </tr>
@@ -1246,6 +1282,13 @@ function renderAdminTable() {
         <tr class="admin-data-row">
           <td data-label="Club"><strong>${escapeHtml(club.name)}</strong></td>
           <td data-label="Città">${escapeHtml(club.city || 'N/A')}</td>
+          <td data-label="Leader">${escapeHtml(club.leaderNickname || 'N/A')}</td>
+          <td data-label="Access Key">
+            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+              <code style="background-color:var(--bg-card); padding:0.2rem 0.5rem; border-radius:var(--radius-sm); border:1px solid var(--border-color); font-weight:800; letter-spacing:0.05em; color:var(--accent-blue);">${escapeHtml(club.accessKey || 'N/A')}</code>
+              ${club.accessKey ? `<button type="button" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="copyClubKeyFromAdmin('${escapeHtml(club.accessKey)}')">Copia</button>` : ''}
+            </div>
+          </td>
           <td class="actions-cell" data-label="Azioni">
             <button class="btn btn-danger btn-sm" onclick="deleteClubFromAdmin('${club.id}')">
               Elimina Club
@@ -1254,6 +1297,243 @@ function renderAdminTable() {
         </tr>
       `).join('');
     }
+  }
+
+  renderAdminRequestsTable();
+}
+
+let currentApprovedData = null;
+
+function openClubApprovedModal(data) {
+  currentApprovedData = data;
+
+  const clubNameEl = document.getElementById('approvedClubNameDisplay');
+  const leaderEl = document.getElementById('approvedLeaderDisplay');
+  const emailEl = document.getElementById('approvedEmailDisplay');
+  const keyEl = document.getElementById('approvedKeyDisplay');
+  const previewEl = document.getElementById('approvedEmailBodyPreview');
+  const sendEmailBtn = document.getElementById('approvedSendEmailBtn');
+
+  if (clubNameEl) clubNameEl.textContent = data.clubName;
+  if (leaderEl) leaderEl.textContent = data.leaderNickname || 'Club Leader';
+  if (emailEl) emailEl.textContent = data.email || 'Nessuna email specificata';
+  if (keyEl) keyEl.textContent = data.accessKey;
+
+  const emailSubject = `Accesso Club Leader BeySide - ${data.clubName}`;
+  const emailBody = `Ciao ${data.leaderNickname || 'Club Leader'}\n\nLa richiesta per il tuo Club "${data.clubName}" è stata approvata!\n\nEcco i dati per accedere al pannello di controllo del tuo Club su BeySide:\n- Sezione: ADMIN del sito BeySide\n- Username: ${data.clubName}\n- Password / Access Key: ${data.accessKey}\n\nDal tuo pannello potrai creare nuovi tornei ufficiali e gestire gli eventi del tuo club.\n\nTeam BeySide`;
+
+  if (previewEl) previewEl.value = emailBody;
+
+  if (sendEmailBtn) {
+    if (data.email) {
+      sendEmailBtn.style.display = 'inline-flex';
+      const mailtoUrl = `mailto:${encodeURIComponent(data.email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      sendEmailBtn.href = mailtoUrl;
+      sendEmailBtn.onclick = (e) => {
+        e.preventDefault();
+        window.location.href = mailtoUrl;
+      };
+    } else {
+      sendEmailBtn.style.display = 'none';
+    }
+  }
+
+  openModal('clubApprovedModal');
+}
+
+const _reqNotesMap = {};
+
+function renderAdminRequestsTable() {
+  const tableBody = document.getElementById('adminClubRequestsTableBody');
+  const badge = document.getElementById('pendingRequestsBadge');
+  const container = document.getElementById('adminClubRequestsContainer');
+  if (!tableBody) return;
+
+  const allRequests = window.storageManager.getClubRequests();
+  const requests = allRequests.filter(r => (r.status || 'pending').toLowerCase() === 'pending' && (r.clubName || '').trim().toLowerCase() !== 'prova');
+  const pendingCount = requests.length;
+
+  if (container) {
+    container.style.display = pendingCount > 0 ? 'block' : 'none';
+  }
+
+  if (badge) {
+    badge.style.display = 'inline-block';
+    if (pendingCount > 0) {
+      badge.className = 'status-badge in_corso';
+      badge.textContent = `[${pendingCount} IN ATTESA]`;
+    } else {
+      badge.className = 'status-badge concluso';
+      badge.textContent = `[0 IN ATTESA]`;
+    }
+  }
+
+  if (requests.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+          Nessuna richiesta di club in attesa.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // Store notes in global map to avoid inline-escaping issues
+  requests.forEach(r => { _reqNotesMap[r.id] = { clubName: r.clubName, notes: r.notes || '' }; });
+
+  tableBody.innerHTML = requests.map(req => {
+    const hasNotes = !!(req.notes && req.notes.trim());
+    const noteCell = hasNotes
+      ? '<button type="button" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem;font-size:0.73rem;" data-reqid="' + req.id + '">Vedi Note</button>'
+      : '<span style="color:var(--text-muted);">&#8212;</span>';
+    return '<tr class="req-data-row">'
+      + '<td><strong>' + escapeHtml(req.clubName) + '</strong></td>'
+      + '<td>' + escapeHtml(req.leaderNickname || 'N/A') + '</td>'
+      + '<td style="font-size:0.8rem;">' + escapeHtml(req.email || 'N/A') + '</td>'
+      + '<td style="text-align:center;">' + noteCell + '</td>'
+      + '<td style="text-align:right;">'
+      +   '<div style="display:inline-flex;gap:0.4rem;">'
+      +     '<button class="btn btn-primary btn-sm" onclick="approveClubRequestAction(\'' + req.id + '\')">Accetta</button>'
+      +     '<button class="btn btn-danger btn-sm" onclick="rejectClubRequestAction(\'' + req.id + '\')">Rifiuta</button>'
+      +   '</div>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // Attach click handlers for 'Vedi Note' buttons (avoids inline escaping)
+  tableBody.querySelectorAll('[data-reqid]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.dataset.reqid;
+      const info = _reqNotesMap[id];
+      if (info) showRequestNoteModal(info.clubName, info.notes);
+    });
+  });
+}
+function approveClubRequestAction(reqId) {
+  const res = window.storageManager.approveClubRequest(reqId);
+  if (res.success) {
+    showToast(`Club "${res.club.name}" approvato! Chiave: ${res.accessKey}`, 'success');
+    renderAdminTable();
+    renderAdminRequestsTable();
+    populateClubDropdown();
+
+    const leader = res.leaderNickname || 'Club Leader';
+    const club = res.club.name;
+    const key = res.accessKey;
+    const email = res.email || '';
+
+    if (email) {
+      const emailSubject = `Accesso Club Leader BeySide - ${club}`;
+      const emailBody = `Ciao ${leader},\r\n\r\nLa richiesta per il tuo Club "${club}" è stata approvata!\r\n\r\nEcco i dati per accedere al pannello di controllo del tuo Club su BeySide:\r\n- Username: ${club}\r\n- Password / Access Key: ${key}\r\n\r\nDal tuo pannello potrai creare nuovi tornei ufficiali e gestire gli eventi del tuo club.\r\n\r\nTeam BeySide`;
+      
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+      // 1. Copy body to clipboard automatically
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(emailBody).catch(() => {});
+      }
+
+      // 2. Automatically open Gmail Web compose in a new tab
+      try {
+        window.open(gmailUrl, '_blank');
+      } catch (err) {
+        console.warn('Auto open Gmail tab blocked', err);
+      }
+
+      // 3. Show clean inline action banner
+      const noticeBox = document.getElementById('adminApprovalNoticeBox');
+      if (noticeBox) {
+        noticeBox.style.display = 'block';
+        noticeBox.innerHTML = `
+          <div style="background-color:var(--bg-card); border:2px solid var(--accent-blue); border-radius:var(--radius-md); padding:1rem; margin-bottom:1.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem;">
+              <div>
+                <div style="font-weight:900; font-size:1.05rem; color:var(--text-main); margin-bottom:0.25rem;">
+                  Club "${escapeHtml(club)}" Approvato con Successo!
+                </div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.35rem;">
+                  Email: <strong style="color:var(--text-main);">${escapeHtml(email)}</strong> | Access Key: <code style="background-color:var(--bg-input); padding:0.15rem 0.4rem; border-radius:3px; font-weight:800; color:var(--accent-blue);">${escapeHtml(key)}</code>
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">
+                  Il testo dell'email con le credenziali è stato copiato negli appunti.
+                </div>
+              </div>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <a href="${gmailUrl}" target="_blank" class="btn btn-primary btn-sm" style="font-weight:800;">
+                  Apri Gmail Web
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('#adminApprovalNoticeBox').style.display='none'">
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+  } else {
+    showToast(res.message || 'Errore durante l\'approvazione.', 'error');
+  }
+}
+
+function rejectClubRequestAction(reqId) {
+  if (confirm("Vuoi rifiutare ed eliminare questa richiesta di Club?")) {
+    const res = window.storageManager.rejectClubRequest(reqId);
+    if (res.success) {
+      showToast("Richiesta eliminata.", "info");
+      renderAdminRequestsTable();
+    }
+  }
+}
+
+function reopenApprovedModal(reqId) {
+  const req = (window.storageManager.getClubRequests() || []).find(r => r.id === reqId);
+  if (!req) return;
+  openClubApprovedModal({
+    clubName: req.clubName,
+    leaderNickname: req.leaderNickname,
+    email: req.email,
+    accessKey: req.generatedKey
+  });
+}
+
+function initClubRequestForm() {
+  const reqForm = document.getElementById('clubRequestForm');
+  if (reqForm) {
+    reqForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitClubRequest(e);
+    });
+  }
+}
+
+function openClubRequestModal() {
+  const form = document.getElementById('clubRequestForm');
+  if (form) form.reset();
+  openModal('clubRequestModal');
+}
+
+function submitClubRequest(e) {
+  if (e) e.preventDefault();
+  const clubName = document.getElementById('reqClubNameInput')?.value.trim();
+  const city = document.getElementById('reqCityInput')?.value.trim();
+  const leaderNickname = document.getElementById('reqLeaderNickInput')?.value.trim();
+  const email = document.getElementById('reqEmailInput')?.value.trim();
+  const notes = document.getElementById('reqNotesInput')?.value.trim();
+
+  if (!clubName || !city || !leaderNickname || !email) {
+    showToast('Compila tutti i campi obbligatori della richiesta.', 'error');
+    return;
+  }
+
+  window.storageManager.addClubRequest({ clubName, city, leaderNickname, email, notes });
+  closeModal('clubRequestModal');
+  showToast('Richiesta inviata con successo! L\'Admin valuterà la tua candidatura.', 'success');
+
+  const session = window.storageManager.getCurrentAdminSession();
+  if (session && session.role === 'admin') {
+    renderAdminRequestsTable();
   }
 }
 
@@ -1270,17 +1550,26 @@ function initClubForm() {
 function saveNewClub() {
   const name = document.getElementById('clubNameInput')?.value.trim();
   const city = document.getElementById('clubCityInput')?.value.trim();
+  const leaderNickname = document.getElementById('clubLeaderNickInput')?.value.trim();
+  const email = document.getElementById('clubEmailInput')?.value.trim();
 
-  if (!name) {
-    showToast('Inserisci il nome del Club.', 'error');
+  if (!name || !city || !leaderNickname) {
+    showToast('Compila Nome Club, Città e Nickname Leader.', 'error');
     return;
   }
 
-  window.storageManager.addClub({ name, city });
-  showToast(`Club "${name}" aggiunto con successo.`, 'success');
+  const newClub = window.storageManager.addClub({ name, city, leaderNickname, email });
+  showToast(`Club "${name}" creato con successo!`, 'success');
   closeModal('clubModal');
   renderAdminTable();
   populateClubDropdown();
+
+  openClubApprovedModal({
+    clubName: newClub.name,
+    leaderNickname: newClub.leaderNickname,
+    email: newClub.email,
+    accessKey: newClub.accessKey
+  });
 }
 
 function deleteClubFromAdmin(clubId) {
@@ -1329,17 +1618,101 @@ function initEventForm() {
   }
 }
 
+function renderClubLeaderPanel(session) {
+  const clubNameEl = document.getElementById('clubLeaderClubName');
+  const nickEl = document.getElementById('clubLeaderNick');
+  const cityEl = document.getElementById('clubLeaderCity');
+  const nickEditInput = document.getElementById('clubLeaderNickEditInput');
+  const cityEditInput = document.getElementById('clubLeaderCityEditInput');
+  const eventsTable = document.getElementById('clubLeaderEventsTableBody');
+
+  const club = (session.clubId && window.storageManager.getClubById(session.clubId)) || window.storageManager.getClubByName(session.clubName) || {};
+  const currentNick = club.leaderNickname || session.leaderNickname || '';
+  const currentCity = club.city || session.city || '';
+
+  if (clubNameEl) clubNameEl.textContent = session.clubName;
+  if (nickEl) nickEl.textContent = currentNick || 'Club Leader';
+  if (cityEl) cityEl.textContent = currentCity || '';
+  if (nickEditInput) nickEditInput.value = currentNick;
+  if (cityEditInput) cityEditInput.value = currentCity;
+
+  if (eventsTable) {
+    const allEvents = window.storageManager.getEvents();
+    const clubEvents = allEvents.filter(evt =>
+      (evt.organizingClub || '').trim().toLowerCase() === session.clubName.trim().toLowerCase()
+    );
+
+    if (clubEvents.length === 0) {
+      eventsTable.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            Nessun torneo creato per <strong>${escapeHtml(session.clubName)}</strong>.<br>
+            Clicca sul tasto <strong>"+ Nuovo Torneo"</strong> in alto per pubblicare il tuo primo evento!
+          </td>
+        </tr>
+      `;
+    } else {
+      eventsTable.innerHTML = clubEvents.map(evt => {
+        const registeredCount = (evt.registeredTeamIds || []).length;
+        const statusClass = evt.status === 'concluso' ? 'concluso' : (evt.status === 'in_corso' ? 'in_corso' : 'aperto');
+        return `
+          <tr class="admin-data-row">
+            <td data-label="Torneo">
+              <a href="#torneo-detail?id=${evt.id}" onclick="openTournamentDetailPage('${evt.id}')" style="cursor:pointer; color:var(--text-main); font-weight:800; text-decoration:underline;">
+                ${escapeHtml(evt.title)}
+              </a>
+            </td>
+            <td data-label="Data">${formatDate(evt.date)} ${escapeHtml(evt.time || '')}</td>
+            <td data-label="Luogo">${escapeHtml(evt.venue || '')}</td>
+            <td data-label="Stato"><span class="status-badge ${statusClass}">[${(evt.status || 'aperto').toUpperCase()}]</span></td>
+            <td data-label="Squadre"><strong>${registeredCount} / ${evt.maxTeams}</strong> Squadre</td>
+            <td class="actions-cell" data-label="Azioni">
+              <div class="admin-row-actions">
+                <button class="btn btn-secondary btn-sm" onclick="editEvent('${evt.id}')">Modifica</button>
+                <button class="btn btn-danger btn-sm" onclick="confirmDeleteEvent('${evt.id}')">Elimina</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
 function openCreateEventModal() {
   const form = document.getElementById('eventForm');
   if (form) form.reset();
-
-  populateClubDropdown();
 
   const idInput = document.getElementById('eventIdInput');
   if (idInput) idInput.value = '';
 
   const titleEl = document.getElementById('eventModalTitle');
   if (titleEl) titleEl.textContent = 'Creazione Nuovo Torneo';
+
+  const session = window.storageManager.getCurrentAdminSession();
+  const selectGroup = document.getElementById('eventClubSelectGroup');
+  const fixedGroup = document.getElementById('eventClubFixedGroup');
+  const fixedDisplay = document.getElementById('eventClubFixedDisplay');
+  const clubSelect = document.getElementById('eventClubSelect');
+  const locationInput = document.getElementById('eventLocationInput');
+
+  if (session && session.role === 'club_leader') {
+    if (selectGroup) selectGroup.style.display = 'none';
+    if (fixedGroup) fixedGroup.style.display = 'block';
+    if (fixedDisplay) fixedDisplay.textContent = session.clubName;
+    if (clubSelect) clubSelect.value = session.clubName;
+
+    // Pre-fill Indirizzo e Città with the club's sede/city
+    const club = (session.clubId && window.storageManager.getClubById(session.clubId)) || window.storageManager.getClubByName(session.clubName);
+    const defaultCity = (club && club.city) || session.city || '';
+    if (locationInput) {
+      locationInput.value = defaultCity;
+    }
+  } else {
+    if (selectGroup) selectGroup.style.display = 'block';
+    if (fixedGroup) fixedGroup.style.display = 'none';
+    populateClubDropdown();
+  }
 
   openModal('eventModal');
 }
@@ -1354,11 +1727,26 @@ function editEvent(id) {
   const evt = window.storageManager.getEventById(id);
   if (!evt) return;
 
-  populateClubDropdown();
+  const session = window.storageManager.getCurrentAdminSession();
+  const selectGroup = document.getElementById('eventClubSelectGroup');
+  const fixedGroup = document.getElementById('eventClubFixedGroup');
+  const fixedDisplay = document.getElementById('eventClubFixedDisplay');
+  const clubSelect = document.getElementById('eventClubSelect');
+
+  if (session && session.role === 'club_leader') {
+    if (selectGroup) selectGroup.style.display = 'none';
+    if (fixedGroup) fixedGroup.style.display = 'block';
+    if (fixedDisplay) fixedDisplay.textContent = evt.organizingClub || session.clubName;
+    if (clubSelect) clubSelect.value = evt.organizingClub || session.clubName;
+  } else {
+    if (selectGroup) selectGroup.style.display = 'block';
+    if (fixedGroup) fixedGroup.style.display = 'none';
+    populateClubDropdown();
+    if (clubSelect) clubSelect.value = evt.organizingClub || '';
+  }
 
   document.getElementById('eventIdInput').value = evt.id;
   document.getElementById('eventTitleInput').value = evt.title || '';
-  document.getElementById('eventClubSelect').value = evt.organizingClub || '';
   document.getElementById('eventDateInput').value = evt.date || '';
   document.getElementById('eventTimeInput').value = evt.time || '';
   document.getElementById('eventVenueInput').value = evt.venue || '';
@@ -1375,7 +1763,19 @@ function saveEvent() {
   const id = document.getElementById('eventIdInput')?.value;
   const rawTitle = document.getElementById('eventTitleInput')?.value?.trim();
   const title = rawTitle ? rawTitle.substring(0, 35) : '';
-  const organizingClub = document.getElementById('eventClubSelect')?.value;
+  const session = window.storageManager.getCurrentAdminSession();
+
+  let organizingClub = '';
+  if (session && session.role === 'club_leader') {
+    organizingClub = session.clubName;
+  } else {
+    organizingClub = document.getElementById('eventClubSelect')?.value;
+    if (!organizingClub) {
+      const clubs = window.storageManager.getClubs();
+      organizingClub = clubs[0] ? clubs[0].name : 'BeySide Club';
+    }
+  }
+
   const date = document.getElementById('eventDateInput')?.value;
   const time = document.getElementById('eventTimeInput')?.value;
   const venue = document.getElementById('eventVenueInput')?.value?.trim();
@@ -1416,7 +1816,12 @@ function saveEvent() {
 
   closeModal('eventModal');
   renderEvents();
-  renderAdminTable();
+
+  if (session && session.role === 'club_leader') {
+    renderClubLeaderPanel(session);
+  } else {
+    renderAdminTable();
+  }
 }
 
 function confirmDeleteEvent(id) {
@@ -1427,7 +1832,13 @@ function confirmDeleteEvent(id) {
     window.storageManager.deleteEvent(id);
     showToast('Torneo eliminato.', 'success');
     renderEvents();
-    renderAdminTable();
+
+    const session = window.storageManager.getCurrentAdminSession();
+    if (session && session.role === 'club_leader') {
+      renderClubLeaderPanel(session);
+    } else {
+      renderAdminTable();
+    }
   }
 }
 
@@ -1564,48 +1975,177 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-/* Admin Password Gate Management */
+/* Admin & Club Leader Authentication and Views */
 function submitAdminLogin(e) {
   if (e) e.preventDefault();
+  const usernameInput = document.getElementById('adminUsernameInput');
   const passInput = document.getElementById('adminPasswordInput');
+
+  const username = usernameInput ? usernameInput.value.trim() : '';
   const pass = passInput ? passInput.value.trim() : '';
 
-  if (pass === 'beyside') {
-    sessionStorage.setItem('beyside_admin_authed', 'true');
-    showToast('Accesso Amministratore effettuato con successo.', 'success');
+  if (!username || !pass) {
+    showToast('Inserisci sia Username che Password/Access Key.', 'error');
+    return;
+  }
+
+  const res = window.storageManager.loginAdminOrClub(username, pass);
+
+  if (res.success) {
+    if (res.role === 'admin') {
+      showToast('Accesso Amministratore Globale effettuato con successo.', 'success');
+    } else {
+      showToast(`Accesso Club Leader: ${res.club.name}!`, 'success');
+    }
     if (passInput) passInput.value = '';
     renderAdminView();
   } else {
-    showToast('Password Admin errata.', 'error');
+    showToast(res.message || 'Credenziali non valide.', 'error');
   }
 }
 
 function logoutAdmin() {
-  sessionStorage.removeItem('beyside_admin_authed');
-  showToast('Logout Admin effettuato.', 'info');
+  window.storageManager.logoutAdminSession();
+  showToast('Logout effettuato con successo.', 'info');
   renderAdminView();
 }
 
 function renderAdminView() {
-  const isAuthed = sessionStorage.getItem('beyside_admin_authed') === 'true';
+  const session = window.storageManager.getCurrentAdminSession();
   const authBox = document.getElementById('adminAuthContainer');
-  const panelBox = document.getElementById('adminPanelContainer');
+  const clubLeaderBox = document.getElementById('clubLeaderPanelContainer');
+  const adminBox = document.getElementById('adminPanelContainer');
 
-  if (!isAuthed) {
+  if (!session) {
     if (authBox) authBox.style.display = 'block';
-    if (panelBox) panelBox.style.display = 'none';
+    if (clubLeaderBox) clubLeaderBox.style.display = 'none';
+    if (adminBox) adminBox.style.display = 'none';
     return;
   }
 
-  if (authBox) authBox.style.display = 'none';
-  if (panelBox) panelBox.style.display = 'block';
+  if (session.role === 'admin') {
+    if (authBox) authBox.style.display = 'none';
+    if (clubLeaderBox) clubLeaderBox.style.display = 'none';
+    if (adminBox) adminBox.style.display = 'block';
+    renderAdminTable();
+  } else if (session.role === 'club_leader') {
+    if (authBox) authBox.style.display = 'none';
+    if (adminBox) adminBox.style.display = 'none';
+    if (clubLeaderBox) clubLeaderBox.style.display = 'block';
+    renderClubLeaderPanel(session);
+  }
+}
 
-  renderAdminTable();
+function copyApprovedKey() {
+  if (currentApprovedData && currentApprovedData.accessKey) {
+    navigator.clipboard.writeText(currentApprovedData.accessKey).then(() => {
+      showToast('Access Key copiata negli appunti!', 'success');
+    }).catch(() => {
+      prompt('Copia la tua Access Key:', currentApprovedData.accessKey);
+    });
+  }
+}
+
+function copyApprovedEmailText() {
+  const preview = document.getElementById('approvedEmailBodyPreview');
+  if (preview && preview.value) {
+    navigator.clipboard.writeText(preview.value).then(() => {
+      showToast('Testo email copiato negli appunti!', 'success');
+    }).catch(() => {
+      prompt('Copia il testo dell\'email:', preview.value);
+    });
+  }
+}
+
+function copyCurrentClubKey() {
+  const session = window.storageManager.getCurrentAdminSession();
+  if (session && session.clubId) {
+    const club = window.storageManager.getClubById(session.clubId);
+    if (club && club.accessKey) {
+      navigator.clipboard.writeText(club.accessKey).then(() => {
+        showToast(`Chiave del club ${club.name} copiata!`, 'success');
+      }).catch(() => {
+        prompt('Chiave del tuo Club:', club.accessKey);
+      });
+    }
+  }
+}
+
+function copyClubKeyFromAdmin(key) {
+  if (key) {
+    navigator.clipboard.writeText(key).then(() => {
+      showToast('Access Key copiata negli appunti!', 'success');
+    }).catch(() => {
+      prompt('Access Key:', key);
+    });
+  }
+}
+
+function updateClubLeaderDetailsAction() {
+  const session = window.storageManager.getCurrentAdminSession();
+  if (!session || session.role !== 'club_leader') return;
+  const nickInput = document.getElementById('clubLeaderNickEditInput');
+  const cityInput = document.getElementById('clubLeaderCityEditInput');
+
+  const newNick = nickInput ? nickInput.value.trim() : '';
+  const newCity = cityInput ? cityInput.value.trim() : '';
+
+  if (!newNick) {
+    showToast('Inserisci un nickname valido per il leader.', 'error');
+    return;
+  }
+  const res = window.storageManager.updateClubLeaderDetails(session.clubId, { leaderNickname: newNick, city: newCity });
+  if (res.success) {
+    showToast('Dati Club Leader aggiornati con successo!', 'success');
+    renderAdminView();
+  } else {
+    showToast(res.message || 'Errore durante l\'aggiornamento.', 'error');
+  }
+}
+
+function updateClubLeaderNicknameAction() {
+  return updateClubLeaderDetailsAction();
+}
+
+
+function showRequestNoteModal(clubName, notes) {
+  // Re-use a simple alert-style popup. Build or reuse a modal element.
+  let modal = document.getElementById('requestNotePopup');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'requestNotePopup';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);';
+    modal.innerHTML = `
+      <div style="background:var(--bg-card);border-radius:var(--radius-md);padding:1.5rem;max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <strong id="requestNotePopupTitle" style="font-size:1rem;color:var(--text-main);"></strong>
+          <button type="button" onclick="document.getElementById('requestNotePopup').style.display='none'" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <p id="requestNotePopupBody" style="font-size:0.9rem;color:var(--text-muted);white-space:pre-wrap;margin:0;"></p>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e){ if(e.target===modal) modal.style.display='none'; });
+  }
+  document.getElementById('requestNotePopupTitle').textContent = `Note – ${clubName}`;
+  document.getElementById('requestNotePopupBody').textContent = notes;
+  modal.style.display = 'flex';
 }
 
 window.openTournamentDetailPage = openTournamentDetailPage;
 window.openCreateEventModal = openCreateEventModal;
 window.openCreateClubModal = openCreateClubModal;
+window.openClubRequestModal = openClubRequestModal;
+window.submitClubRequest = submitClubRequest;
+window.approveClubRequestAction = approveClubRequestAction;
+window.rejectClubRequestAction = rejectClubRequestAction;
+window.showRequestNoteModal = showRequestNoteModal;
+window.reopenApprovedModal = reopenApprovedModal;
+window.copyApprovedKey = copyApprovedKey;
+window.copyApprovedEmailText = copyApprovedEmailText;
+window.copyCurrentClubKey = copyCurrentClubKey;
+window.copyClubKeyFromAdmin = copyClubKeyFromAdmin;
+window.updateClubLeaderNicknameAction = updateClubLeaderNicknameAction;
+window.updateClubLeaderDetailsAction = updateClubLeaderDetailsAction;
 window.editEvent = editEvent;
 window.confirmDeleteEvent = confirmDeleteEvent;
 window.deleteTeamFromAdmin = deleteTeamFromAdmin;
